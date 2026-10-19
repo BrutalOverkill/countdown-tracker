@@ -109,9 +109,21 @@ body {
   .chip[data-status='won'] { color: var(--color-count); }
 
   .tab { color: var(--color-muted); }
-  .tab.is-active { background: var(--color-accent); color: #000; font-weight: 700; }
+  .tab.is-active { background: rgb(255 255 255 / 0.2); color: #fff; font-weight: 700; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35); }
+  /* Frosted-glass tab bar on phones: the tiles blur through it as you scroll. */
+  @media (width < 64rem) {
+    .glass-bar {
+      background: rgb(255 255 255 / 0.08);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgb(255 255 255 / 0.18);
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 10px 30px rgb(0 0 0 / 0.45);
+    }
+    .glass-bar .tab:not(.is-active) { color: rgb(255 255 255 / 0.78); }
+    [data-theme='matrix'] .glass-bar { background: rgb(0 0 0 / 0.35); border-color: rgb(255 255 255 / 0.14); }
+  }
   [data-theme='matrix'] .tab { text-transform: uppercase; letter-spacing: 0.12em; font-size: 10px; }
-  [data-theme='matrix'] .tab.is-active { background: transparent; color: #f2f2f2; }
+  [data-theme='matrix'] .tab.is-active { background: rgb(255 255 255 / 0.1); color: #f2f2f2; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
   [data-theme='matrix'] .tab.is-active::before { content: '●'; color: var(--color-accent); }
 
   /* Motion (spec §4.0.1). */

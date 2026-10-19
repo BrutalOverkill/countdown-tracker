@@ -11,9 +11,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     <nav aria-label="Main"
       class="fixed inset-x-0 bottom-0 z-20 flex justify-center pb-[calc(env(safe-area-inset-bottom)+12px)]
              lg:static lg:block lg:w-48 lg:shrink-0 lg:pb-0 lg:pt-6">
-      <ul class="flex gap-1 rounded-full bg-[#161616]/95 px-2 py-1.5 shadow-lg backdrop-blur
-                 matrix:border matrix:border-line matrix:bg-black/95
-                 lg:flex-col lg:rounded-2xl lg:bg-transparent lg:shadow-none">
+      <ul class="glass-bar flex gap-1 rounded-full px-2 py-1.5 lg:flex-col lg:rounded-2xl">
         @for (tab of tabs; track tab.path) {
           <li>
             <a [routerLink]="tab.path" routerLinkActive="is-active" ariaCurrentWhenActive="page"
