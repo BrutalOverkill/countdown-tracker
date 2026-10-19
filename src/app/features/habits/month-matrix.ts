@@ -1,7 +1,7 @@
 import { eachDay, monthEnd, monthStart, weekBlock } from '@shared/days';
 import { dayScore, habitDone, isPerfect } from '../../domain/scoring';
 import { bestRun } from '../../domain/streaks';
-import { habitsForMonth, isActiveOn } from '../../domain/visibility';
+import { habitsForMonth, isActiveOn, isDue } from '../../domain/visibility';
 import type { Ctx, Day, Habit } from '../../domain/types';
 
 export interface MatrixRow { habit: Habit; done: boolean[]; doneCount: number; elapsed: number; bestStreak: number }
@@ -22,16 +22,19 @@ export function buildMonthMatrix(habits: readonly Habit[], month: Day, ctx: Ctx,
   const past = (d: Day) => d <= ctx.today;
 
   const rows = visible
-    .filter((h) => h.frequency === 'daily')
+    .filter((h) => h.frequency === 'daily' || h.frequency === 'interval')
     .map((habit) => {
+      // Interval habits are judged on their due days only (§8.5).
+      const checks = ctx.history.checks.get(habit.id);
+      const counts = (d: Day) => (habit.frequency === 'interval' ? isDue(habit, d, checks) : isActiveOn(habit, d));
       // The wheel shows final results, so today's calories/fasting stay empty until the day is over.
       const done = days.map((d) => isActiveOn(habit, d) && habitDone(habit, d, ctx, 'final'));
       return {
         habit,
         done,
-        doneCount: days.filter((d, i) => done[i] && past(d)).length,
-        elapsed: days.filter((d) => past(d) && isActiveOn(habit, d)).length,
-        bestStreak: bestRun(done.filter((_, i) => past(days[i]))),
+        doneCount: days.filter((d, i) => done[i] && past(d) && counts(d)).length,
+        elapsed: days.filter((d) => past(d) && counts(d)).length,
+        bestStreak: habit.frequency === 'interval' ? 0 : bestRun(done.filter((_, i) => past(days[i]))),
       };
     });
 

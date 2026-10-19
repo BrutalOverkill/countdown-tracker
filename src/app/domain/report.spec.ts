@@ -44,4 +44,12 @@ describe('buildReport', () => {
     const short: Countdown = { ...cd, createdDay: '2026-10-07' };
     expect(buildReport(short, habits, [], ctx('2026-10-11', h)).bestWeek).toBeNull();
   });
+
+  it('scores an every-N-days habit by due days done', () => {
+    const derma = habit('d', { frequency: 'interval', intervalDays: 4, intervalStart: '2026-10-20', source: 'manual' });
+    const cd: Countdown = { id: 'c', title: 'Diwali', emoji: '🪔', targetDate: '2026-10-28', createdDay: '2026-10-20' };
+    const r = buildReport(cd, [derma], [], ctx('2026-10-28', history({ checks: { d: ['2026-10-20', '2026-10-26'] } })));
+    // Period 20–27: due 20 (done), 24, 25, 26 (done) → 2 of 4.
+    expect(r.habits).toEqual([{ id: 'd', name: 'd', color: '#FFFFFF', percent: 50 }]);
+  });
 });

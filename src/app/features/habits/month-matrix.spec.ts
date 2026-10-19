@@ -42,4 +42,13 @@ describe('buildMonthMatrix', () => {
   it('fills weekly blocks W1–W5', () => {
     expect(m.weekly).toEqual([{ habit: habits[3], blocks: [true, false, true, false, false] }]);
   });
+
+  it('gives an every-N-days habit a row whose stats count due days', () => {
+    const derma = habit('d', { frequency: 'interval', intervalDays: 4, intervalStart: '2026-10-20' });
+    const m = buildMonthMatrix([derma], '2026-10-01', ctx('2026-10-31', history({ checks: { d: ['2026-10-20', '2026-10-26'] } })), new Set());
+    expect(m.rows.map((r) => r.habit.id)).toEqual(['d']);
+    expect(m.weekly).toEqual([]);
+    // Due 20 (done), 24–26 (done 26), 30–31: 6 due days, 2 done.
+    expect(m.rows[0]).toMatchObject({ doneCount: 2, elapsed: 6 });
+  });
 });

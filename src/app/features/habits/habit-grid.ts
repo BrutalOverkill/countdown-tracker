@@ -45,7 +45,7 @@ import type { MonthMatrix } from './month-matrix';
       @for (row of m.rows; track row.habit.id) {
         <p class="flex justify-between gap-2 text-xs">
           <span><span class="mr-1 inline-block size-2 rounded-full" [style.background]="dotColor(row.habit)"></span>{{ row.habit.name }}</span>
-          <span><b>{{ row.doneCount }}/{{ row.elapsed }}</b> days · best streak {{ row.bestStreak }}</span>
+          <span><b>{{ row.doneCount }}/{{ row.elapsed }}</b> {{ row.habit.frequency === 'interval' ? 'due days done' : 'days · best streak ' + row.bestStreak }}</span>
         </p>
       }
     </div>

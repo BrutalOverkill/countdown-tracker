@@ -2,7 +2,7 @@ import { addDays, eachDay } from '@shared/days';
 import { challengeProgress } from './challenges';
 import { dayScore, habitDone, isPerfect, onCalorieTarget, trainedOn } from './scoring';
 import { classifyDays, longestStreak } from './streaks';
-import { bySortOrder, isActiveOn } from './visibility';
+import { bySortOrder, isActiveOn, isDue } from './visibility';
 import type { Challenge, Countdown, Ctx, Day, Habit } from './types';
 
 export type Grade = 'A+' | 'A' | 'B' | 'C' | 'D';
@@ -73,13 +73,15 @@ export function buildReport(countdown: Countdown, habits: readonly Habit[], chal
       })
       .filter(isPresent),
     habits: habits
-      .filter((h) => h.frequency === 'daily' && h.source === 'manual')
+      .filter((h) => (h.frequency === 'daily' || h.frequency === 'interval') && h.source === 'manual')
       .sort(bySortOrder)
       .map((h) => {
         const active = days.filter((d) => isActiveOn(h, d));
-        if (active.length === 0) return null;
-        const done = active.filter((d) => habitDone(h, d, ctx)).length;
-        return { id: h.id, name: h.name, color: h.color, percent: Math.round((100 * done) / active.length) };
+        // An interval habit is judged on its due days only (§8.3).
+        const counted = h.frequency === 'interval' ? active.filter((d) => isDue(h, d, ctx.history.checks.get(h.id))) : active;
+        if (counted.length === 0) return null;
+        const done = counted.filter((d) => habitDone(h, d, ctx)).length;
+        return { id: h.id, name: h.name, color: h.color, percent: Math.round((100 * done) / counted.length) };
       })
       .filter(isPresent),
   };
