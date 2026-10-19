@@ -17,7 +17,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         @for (tab of tabs; track tab.path) {
           <li>
             <a [routerLink]="tab.path" routerLinkActive="is-active" ariaCurrentWhenActive="page"
-              class="tab press flex items-center gap-1.5 rounded-full px-3 py-2 text-xs text-muted lg:rounded-xl lg:text-sm"><span class="text-base matrix:hidden" aria-hidden="true">{{ tab.icon }}</span>{{ tab.label }}</a>
+              class="tab press flex items-center gap-1.5 rounded-full px-3 py-2 text-xs lg:rounded-xl lg:text-sm"><span class="text-base matrix:hidden" aria-hidden="true">{{ tab.icon }}</span>{{ tab.label }}</a>
           </li>
         }
       </ul>

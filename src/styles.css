@@ -103,6 +103,7 @@ body {
   .chip[data-status='behind'] { color: var(--color-kcal); }
   .chip[data-status='won'] { color: var(--color-count); }
 
+  .tab { color: var(--color-muted); }
   .tab.is-active { background: var(--color-accent); color: #000; font-weight: 700; }
   [data-theme='matrix'] .tab { text-transform: uppercase; letter-spacing: 0.12em; font-size: 10px; }
   [data-theme='matrix'] .tab.is-active { background: transparent; color: #f2f2f2; }

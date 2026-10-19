@@ -1,14 +1,18 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
+import { eachDay, monthStart } from '@shared/days';
 import { AuthService } from '../../core/auth.service';
 import { Online } from '../../core/online';
 import { TrackerStore } from '../../data/tracker.store';
+import { dayScore, isPerfect } from '../../domain/scoring';
+import { overallStreak } from '../../domain/streaks';
+import { PerfectDay } from './perfect-day';
 import { TabBar } from './tab-bar';
 import { Toast } from './toast';
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, TabBar, Toast],
+  imports: [RouterOutlet, TabBar, Toast, PerfectDay],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="mx-auto flex min-h-dvh max-w-5xl pt-[env(safe-area-inset-top)] lg:gap-6 lg:px-6">
@@ -34,6 +38,8 @@ import { Toast } from './toast';
       </main>
     </div>
     <app-toast />
+    @let p = perfectInfo();
+    <app-perfect-day [perfect]="p.perfect" [today]="store.today()" [rings]="p.rings" [streak]="p.streak" [countThisMonth]="p.count" />
   `,
 })
 export class Shell {
@@ -41,6 +47,18 @@ export class Shell {
   protected readonly online = inject(Online);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+
+  protected readonly perfectInfo = computed(() => {
+    const ctx = this.store.ctx();
+    const habits = this.store.habits();
+    const score = dayScore(habits, ctx.today, ctx);
+    return {
+      perfect: this.store.loaded() && isPerfect(score),
+      rings: score.total,
+      streak: overallStreak(habits, ctx).length,
+      count: eachDay(monthStart(ctx.today), ctx.today).filter((d) => isPerfect(dayScore(habits, d, ctx))).length,
+    };
+  });
 
   constructor() {
     this.retry();
