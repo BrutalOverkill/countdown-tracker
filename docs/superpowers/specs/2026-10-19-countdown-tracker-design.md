@@ -389,14 +389,48 @@ What blocks:
   - workout de-duplication
   - pending/message builder
   - Food Guard result: below / exactly at / above the goal, no entries, fasting hours (blocked even with 0 kcal), fasting off, both reasons at once (target message wins)
-- **RLS check:** a script signs in as a second test user and confirms it can read and write none of the owner's rows.
-- **Browser check:** every screen exercised in a real browser on the PC (phone-sized and desktop-sized) before calling it done.
-- **On-device check (Anvit):** install to home screen, build the Shortcut, run it once, confirm steps/workout appear and the nudge shows.
+Six layers (chose Q13). The first two run in CI on every push. Layers 3–5 run on demand: locally with `npm run test:live`, or from a manual GitHub workflow. They use a dedicated **test user** whose data is wiped at the start of each run.
+
+1. **Unit tests:** everything listed above and below, written test-first.
+2. **Component tests** (Angular TestBed): each screen's components get fed sample view models. They assert on what's rendered and what taps emit. Cases include:
+   - fasting card open vs fasting
+   - ⚠️ on an outside-window entry
+   - challenge chips
+   - Perfect Day overlay shown once per day
+   - Settings validation messages
+3. **End-to-end browser tests** (Playwright, Chromium, phone-sized and desktop-sized) against the app on a local dev server and the real Supabase project, signed in as the test user. The browser clock is pinned with `page.clock`, so time-based states are deterministic. Covers:
+   - login / logout
+   - ticking routines → score, rings and wheel update
+   - quick-add, saved foods and the time field → totals and ⚠️
+   - a countdown + challenge → challenge card
+   - fasting card at a pinned "fasting" time and a pinned "window open" time
+   - the 4 AM rollover (3:59 AM vs 4:00 AM)
+   - the report card on a countdown's date
+   - offline banner (`context.setOffline`)
+   - Settings validation for windows
+4. **Live function tests** (Node script, test user's token):
+   - `sync`: 401 (no/wrong token), 400 (bad bodies), 200 with steps + workouts, idempotent re-send, Shortcuts quirks (strings, single object, nulls), pending/nudge message
+   - `food-guard`: under target inside a window, at target, outside the windows with 0 kcal, fasting off. Windows are set relative to the real current time, because the server's clock can't be pinned.
+5. **Security test** (Node script):
+   - signed in as the test user, every table returns only the test user's rows
+   - inserting a row for any other `user_id` is rejected
+   - signed out (anon key only), every table returns nothing and `ensure_setup` / `rotate_sync_token` are refused
+6. **iPhone test checklist** — `docs/test-plan.md`: numbered manual cases with steps and expected results, for what only the phone can show:
+   - home-screen install, icon, standalone launch; offline launch
+   - Countdown Sync by tap and by the 1:30 AM automation; the nudge text
+   - steps/workout appearing in the app
+   - Food Guard outside the windows (e.g. 2 PM), inside a window under target (e.g. 11:30 AM), at target, App Store blocked, server unreachable (airplane mode → app opens)
+   - 4 AM rollover on the device
+   - Perfect Day overlay on the phone
+
+Before calling a task done, every screen is also checked by hand in a real browser on the PC (phone-sized and desktop-sized).
 
 ## 13. Setup steps that need Anvit
 
 1. Create a free Supabase account and a project ("countdown", region Mumbai). Share the project URL, and run `npx supabase login` once so the CLI can deploy.
-2. After first deploy: create the owner login (email + password), then sign-ups get switched off.
+2. In the Supabase dashboard: switch sign-ups off, then create two users (email + password, auto-confirmed):
+   - Anvit's own login
+   - a **test user** for layers 3–5 of §12, whose details go in the git-ignored `.env.local` (and, for the manual GitHub workflow, as repository secrets)
 3. On the iPhone: open the site in Safari → Share → Add to Home Screen; build the Shortcut and the 1:30 AM automation from the written steps; build the Food Guard shortcut and its App-opened automation (ticking each food app + the App Store).
 
 ## 14. Risks to verify early
