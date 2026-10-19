@@ -1,7 +1,7 @@
 # Countdown — personal tracker: design spec
 
 - **Date:** 2026-10-19
-- **Status:** Draft, awaiting Anvit's review
+- **Status:** Approved and built (19 Oct 2026). **Amendment A (20 Oct 2026):** "every N days" habits, Dermarolling every 4 days with a due-today highlight (§8.5); supplements as an ordinary daily habit.
 - **Repo:** `BrutalOverkill/countdown-tracker` (public)
 
 ## 1. Purpose
@@ -24,7 +24,7 @@ A personal tracker for Anvit, used on the iPhone (installed to the home screen) 
 | Steps | iPhone **Shortcut** reads Apple Health and sends to the backend | chose (Q1) |
 | Calories | Quick entry (name + kcal, optional protein) + saved foods for one-tap re-add | chose (Q2) |
 | Workouts | From the **Strong** app via Apple Health, session level only (trained? which, how long); fallback one-tap "trained ✓" | chose (Q4) |
-| Skincare / hair | Habits: AM skincare, PM skincare, Minoxidil AM, Minoxidil PM (daily); Dermarolling (weekly) | said |
+| Skincare / hair | Habits: AM skincare, PM skincare, Minoxidil AM, Minoxidil PM (daily); Dermarolling (every 4 days after the last session — Amendment A); Supplements is a daily habit Anvit adds in Settings | said |
 | Reminders | One evening nudge from the Shortcut listing what's left today | chose (Q5) |
 | Visual style | Two dark themes, **Bento** (colour-block tiles) and **Matrix** (dot-matrix, red accent). Theme is **Auto** by time of day: Bento 6 AM–7 PM, Matrix 7 PM–6 AM. A ◐ toggle overrides until the next switch-over. Replaces the earlier "style B dark & bold" | chose (Q15–Q17, mockups) |
 | Habit view | Planner-style **wheel** + **grid**, with a toggle | chose (mockups) |
@@ -115,7 +115,8 @@ The cards below are those tiles, with tile tones as in §4.0.
   - Calories: today's total / calorie goal.
   - Routines: manual daily habits ticked today / manual daily habits total.
 - **Workout card:** today's workout(s) from Strong ("Push day · 52 min ✓" — name as provided by Health, e.g. "Strength Training", if Strong's name isn't available). If none: a **"Trained today ✓"** button that records a manual workout. A manual workout can be removed by tapping it (Health-synced ones can't).
-- **Routines card:** manual daily habits grouped by slot (morning / night / anytime), each a tap-to-tick circle; tapping again un-ticks. Below: weekly habits with this week's status ("Dermarolling this week: done Sun ✓" or a tick button).
+- **Routines card:** manual daily habits grouped by slot (morning / night / anytime), each a tap-to-tick circle; tapping again un-ticks. Below: weekly habits with this week's status (e.g. "done Sun ✓" or a tick button), and one line per interval habit that isn't due: "🪡 Dermarolling · next Sat 24 Oct", or "✓ Dermarolling done · next Sat 24 Oct" on the day it was ticked.
+- **Due card (Amendment A):** every interval habit that is **due or overdue** today and not yet ticked gets a full-width card right below the header, coloured so it stands out — "🪡 Dermarolling — due today" with a large **Done ✓** button; when overdue it turns red: "overdue since Sat 24 Oct (2 days)". In Matrix: red border and a "● DUE TODAY" label. Ticking it collapses the card into the routines line above.
 - Tapping the rings card's calories line opens Food.
 
 ### 4.2 Habits
@@ -123,6 +124,7 @@ The cards below are those tiles, with tile tones as in §4.0.
 - **Wheel:** a 270° spiral from 12 o'clock clockwise. One ring per daily habit (outermost = first in sort order), one spoke per day of the month, day numbers in an outer band, and habit names on lines in the empty quadrant (as in the paper planner). A filled dot means done. Today's spoke is highlighted. Auto habits are marked ⚡. A **gold ⭐** sits in the day band on every past Perfect Day.
 - **Grid:** rows = daily habits, columns = days 1–31; same dots and highlight. Tapping a dot for a **manual** habit on a past day or today toggles it (to fix a forgotten tick); future days and auto habits aren't tappable. The day header shows ⭐ over past Perfect Days and ❄️ over days saved by a streak freeze. Below the grid: per-habit "done X / elapsed days · best streak N".
 - **Weekly** card: rows = weekly habits, columns W1–W5, filled if done in that week.
+- Interval habits (§8.5) get a ring on the wheel and a row in the grid like daily habits; a dot marks a day it was done. Their grid stats read "done X / due days".
 - **Monthly one-offs** card: a checklist of tasks for the shown month, with "+ add", tick, and swipe-to-delete.
 - Habits shown for a month: those created on or before the month's last day and not archived before its first day.
 
@@ -142,7 +144,7 @@ The cards below are those tiles, with tile tones as in §4.0.
   - Tapping a **past** countdown opens its report card.
 - **Habits:** list in sort order, drag to reorder; add / edit:
   - name, emoji, colour (defaults to the next rainbow colour)
-  - frequency: daily / weekly
+  - frequency: daily / weekly / every N days (N = 2–30; default 4). Choosing "every N days" sets the first due day to today.
   - slot: morning / night / anytime
   - for weekly habits, a preferred weekday (used for the nudge)
 
@@ -203,7 +205,7 @@ Every table has `user_id uuid not null default auth.uid() references auth.users`
 |---|---|---|
 | `settings` | `step_goal int default 10000`, `kcal_goal int default 2000`, `sync_token_hash text null`, `last_sync_at timestamptz null`, `fasting_enabled boolean default true`, `eating_windows jsonb default '[{"start":"00:00","end":"01:00"},{"start":"11:00","end":"13:00"}]'` (array of `{start,end}` `HH:MM` IST clock times, end exclusive) | PK `user_id` |
 | `countdowns` | `id uuid`, `title text`, `emoji text`, `target_date date`, `created_at` | |
-| `habits` | `id uuid`, `name text`, `emoji text`, `color text`, `frequency text check in ('daily','weekly')`, `source text check in ('manual','steps','calories','workout','fasting')`, `slot text check in ('morning','night','anytime')`, `weekday smallint null` (0 = Sun, weekly only), `sort_order int`, `archived_at timestamptz null`, `created_at` | Seeded: 10k steps, Calories on target, Workout, Fasting windows kept (auto); AM skincare, PM skincare, Minoxidil AM, Minoxidil PM (daily manual); Dermarolling (weekly manual, preferred day Sunday — editable) |
+| `habits` | `id uuid`, `name text`, `emoji text`, `color text`, `frequency text check in ('daily','weekly','interval')`, `interval_days smallint null` (2–30) and `interval_start date null` (first due day) — both set exactly when `frequency = 'interval'`, `source text check in ('manual','steps','calories','workout','fasting')`, `slot text check in ('morning','night','anytime')`, `weekday smallint null` (0 = Sun, weekly only), `sort_order int`, `archived_at timestamptz null`, `created_at` | Seeded: 10k steps, Calories on target, Workout, Fasting windows kept (auto); AM skincare, PM skincare, Minoxidil AM, Minoxidil PM (daily manual); Dermarolling (manual, every 4 days, first due on the setup day — editable) |
 | `habit_checks` | `id uuid`, `habit_id uuid → habits`, `day date`, `created_at` | unique (`habit_id`, `day`); only for `source = 'manual'` |
 | `tasks` | `id uuid`, `title text`, `month date` (first of month), `done_at timestamptz null`, `created_at` | monthly one-offs |
 | `challenges` | `id uuid`, `countdown_id uuid → countdowns on delete cascade`, `habit_id uuid → habits`, `target_days int check > 0`, `start_day date`, `created_at` | max 3 per countdown (enforced in the app); window = `start_day` … `target_date − 1` |
@@ -245,6 +247,7 @@ Behaviour:
 5. Work out what's pending for the app's today:
    - manual daily habits not ticked today
    - weekly habits whose `weekday` is today's weekday and that aren't done in the current week (§8)
+   - interval habits that are due today (§8.5) and not ticked today
 6. Reply `200`:
 
 ```json
@@ -290,7 +293,7 @@ Behaviour:
 
 ### 8.1 Daily score, Perfect Day, streak
 
-- **Daily habits of a day** = habits with `frequency = 'daily'` that are active that day (created on/before it, not archived on/before it). Weekly habits are not part of the score.
+- **Habits of a day** = active habits (created on/before it, not archived on/before it) that are either `frequency = 'daily'`, or interval habits **due** that day (§8.5). Weekly habits are not part of the score.
 - **Done for scoring** = the done rules above, with one exception. For **today only**, the calories habit counts as done while *on track*: at least one entry and total ≤ goal.
 - **Score** = `round(100 × done ÷ count)`; 0 if `count = 0`.
 - **Perfect Day** = score 100. A past day's ⭐ uses the final rules, so a day that looked perfect at 8 PM but went over on calories doesn't keep its star.
@@ -325,7 +328,7 @@ For a challenge with window `start_day … end_day` (`end_day = target_date − 
 - **Grade:** A+ ≥ 90, A ≥ 80, B ≥ 70, C ≥ 60, D < 60.
 - **Best streak** = longest run of good days within the period, freezes applied as in §8.1.
 - **Workout days** = days in the period with a workout. **Calorie target days** = days the calories habit was done.
-- **Habit %** = done days ÷ active days in the period, per manual daily habit.
+- **Habit %** = done days ÷ active days in the period, per manual daily habit; for an interval habit, done-while-due days ÷ due days.
 
 ### 8.4 Eating windows
 
@@ -334,6 +337,16 @@ For a challenge with window `start_day … end_day` (`end_day = target_date − 
 - **Next window start** = the first window start later than now; if none is left today, the earliest start tomorrow. It's shown as `h:mm AM/PM`, e.g. `12:00 AM`, `11:00 AM`.
 - **Current fast** (fasting card): from the most recent window end before now to the next window start. With the defaults, that's 1:00 AM → 11:00 AM (10 h) and 1:00 PM → 12:00 AM (11 h).
 - **Valid windows:** 1–3 windows; `HH:MM` 24-hour; start < end; no two overlap. Saved sorted by start.
+
+### 8.5 Interval habits — "every N days" (Amendment A)
+
+- An interval habit has `interval_days = N` and `interval_start` = its first due day.
+- **Next due on day D** = (latest tick strictly before D) + N; if there's no tick on or after `interval_start` before D, it's `interval_start`.
+- **Due on D** = D ≥ next due on D, and the habit is active on D. Being due counts as an open routine in that day's score (§8.1) until it's ticked; overdue days keep counting, so an overdue session blocks a Perfect Day.
+- A tick on a day it isn't due is allowed (from the grid) and restarts the cycle from that day, but that day doesn't count it in the score.
+- **Shown "next" date** = today + N on the day it's ticked; otherwise next due as above. Overdue days = today − next due.
+- **Challenges** stay daily-habits only.
+- Dermarolling becomes `interval_days = 4`, `interval_start` = the later of its app creation day and 2026-10-20; new accounts get it with `interval_start` = the setup day.
 
 ## 9. iPhone Shortcut
 
