@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
 import { addDays, instantFor, type Day } from '@shared/days';
 import { Clock } from '../../core/clock';
 import { dayLabel, formatNumber } from '../../core/format';
@@ -42,7 +42,7 @@ import { defaultTime, foodLines, parseFood, suggest, totals, type FoodLine } fro
           <input #name class="field" name="name" placeholder="Food…" maxlength="60" autocomplete="off" [disabled]="!online()" (input)="query.set(name.value)" />
           <input #kcal class="field !w-[4.5rem]" name="kcal" inputmode="numeric" placeholder="kcal" [disabled]="!online()" />
           <input #protein class="field !w-[5.5rem]" name="protein" inputmode="decimal" placeholder="protein g" [disabled]="!online()" />
-          <input #time class="field !w-[6.5rem]" name="time" type="time" [value]="defaultTime()" [disabled]="!online()" />
+          <input #time class="field !w-[6.5rem]" name="time" type="time" [value]="chosenTime() ?? defaultTime()" [disabled]="!online()" (input)="chosenTime.set(time.value)" />
           <button type="button" class="btn-quiet" [attr.aria-pressed]="saveIt()" (click)="saveIt.set(!saveIt())">{{ saveIt() ? '★ saved' : '☆ save' }}</button>
           <button class="btn flex-1" type="submit" [disabled]="!online() || busy()">Add</button>
         </form>
@@ -107,7 +107,13 @@ export class FoodPage {
   protected readonly online = inject(Online).online;
   protected readonly n = formatNumber;
 
-  protected readonly day = signal<Day>(this.store.today());
+  // Follows the app day across 4 AM while showing today; a day picked with ‹ › stays put.
+  protected readonly day = linkedSignal<Day, Day>({
+    source: this.store.today,
+    computation: (today, prev) => (prev && prev.value !== prev.source ? prev.value : today),
+  });
+  // A time the user typed; cleared on a new day or after an add, so the field goes back to "now".
+  protected readonly chosenTime = linkedSignal<Day, string | null>({ source: this.day, computation: () => null });
   protected readonly entries = signal<FoodEntryRow[]>([]);
   protected readonly saved = signal<SavedFoodRow[]>([]);
   protected readonly query = signal('');
@@ -186,12 +192,13 @@ export class FoodPage {
       protein.value = '';
       this.query.set('');
       this.saveIt.set(false);
+      this.chosenTime.set(null);
     });
   }
 
   protected async addSaved(food: SavedFoodRow): Promise<void> {
     await this.run(async () => {
-      const eatenAt = instantFor(this.day(), this.defaultTime()).toISOString();
+      const eatenAt = instantFor(this.day(), this.chosenTime() ?? this.defaultTime()).toISOString();
       const row = await this.api.addFood({ day: this.day(), eatenAt, name: food.name, kcal: food.kcal, proteinG: food.protein_g, savedFoodId: food.id });
       await this.bump(food);
       this.commit([...this.entries(), row]);

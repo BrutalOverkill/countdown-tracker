@@ -3,6 +3,7 @@ import { ctx, habit, history } from '../../domain/testing';
 import { ThemeService } from '../../core/theme.service';
 import { TrackerApi } from '../../data/tracker-api';
 import { HabitGrid } from './habit-grid';
+import { HabitsPage } from './habits.page';
 import { HabitWheel } from './habit-wheel';
 import { buildMonthMatrix } from './month-matrix';
 import { TasksCard } from './tasks-card';
@@ -89,5 +90,27 @@ describe('Habits cards', () => {
     del.click();
     await settle(fixture);
     expect(api.deleteTask).toHaveBeenCalledWith('t1');
+  });
+});
+
+describe('HabitsPage', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.useFakeTimers({ toFake: ['Date'] });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('moves to the new month at 4 AM when it was showing the current one', async () => {
+    vi.setSystemTime(new Date('2026-10-31T17:30:00Z')); // 11 PM IST, 31 Oct
+    TestBed.configureTestingModule({ providers: [{ provide: TrackerApi, useValue: { loadTasks: vi.fn().mockResolvedValue([]) } }] });
+    const fixture = TestBed.createComponent(HabitsPage);
+    await settle(fixture);
+    const header = () => (fixture.nativeElement as HTMLElement).querySelector('header')?.textContent;
+    expect(header()).toContain('Oct 2026');
+
+    vi.setSystemTime(new Date('2026-11-01T03:30:00Z')); // 9 AM IST, 1 Nov
+    document.dispatchEvent(new Event('visibilitychange'));
+    await settle(fixture);
+    expect(header()).toContain('Nov 2026');
   });
 });

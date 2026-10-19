@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { addMonths, monthStart } from '@shared/days';
+import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal, signal } from '@angular/core';
+import { addMonths, monthStart, type Day } from '@shared/days';
 import { monthLabel } from '../../core/format';
 import { Online } from '../../core/online';
 import { storageGet, storageSet } from '../../core/storage';
@@ -55,7 +55,11 @@ export class HabitsPage {
   protected readonly online = inject(Online).online;
   protected readonly views: { id: View; label: string }[] = [{ id: 'wheel', label: '◔ Wheel' }, { id: 'grid', label: '▦ Grid' }];
   protected readonly view = signal<View>(storageGet('habits-view') === 'grid' ? 'grid' : 'wheel');
-  protected readonly month = signal(monthStart(this.store.today()));
+  // Follows the current month across 4 AM while showing it; a month picked with ‹ › stays put.
+  protected readonly month = linkedSignal<Day, Day>({
+    source: computed(() => monthStart(this.store.today())),
+    computation: (current, prev) => (prev && prev.value !== prev.source ? prev.value : current),
+  });
   protected readonly label = computed(() => monthLabel(this.month()));
   private readonly firstMonth = computed(() => monthStart(firstHabitDay(this.store.habits()) ?? this.store.today()));
   protected readonly canGoBack = computed(() => this.month() > this.firstMonth());
