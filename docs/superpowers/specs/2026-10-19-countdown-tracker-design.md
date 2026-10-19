@@ -306,12 +306,12 @@ For a challenge with window `start_day … end_day` (`end_day = target_date − 
 
 If Workouts can't be read, the Shortcut sends steps only, and the workout card relies on "Trained today ✓". The rest of the design is unchanged.
 
-**Shortcut outline** (exact step-by-step instructions are written during implementation, in `docs/iphone-shortcut.md` and linked from Settings):
+**Shortcut outline** (exact step-by-step instructions are written during implementation, in `docs/iphone-shortcut.md` and linked from Settings). Shortcuts' JSON body can't reliably hold a list of dictionaries, so the Shortcut sends one small request per item. The server accepts a bare object as a one-item list, and an empty body as "nothing to save".
 1. Text: the sync token (pasted from Settings).
-2. Find Health Samples — Steps, last 7 days, grouped by day → for each: build `{date (yyyy-MM-dd), count}` and add to a list.
-3. Find Health Samples — Workouts, last 2 days → for each: build `{start (ISO 8601), durationMin, name}` and add to a list.
-4. Get Contents of URL — POST the JSON from §7 with the `Authorization` header.
-5. If the reply has `error` → Show Notification "Countdown sync failed: {error}". Otherwise, if `message` isn't empty → Show Notification `{message}`.
+2. Find Health Samples — Steps, last 7 days, grouped by day → for each: POST `{"steps": {"date": yyyy-MM-dd, "count": n}}`.
+3. Find Health Samples — Workouts, last 2 days → for each: POST `{"workouts": {"start": ISO 8601, "durationMin": n, "name": type}}`.
+4. A final POST `{"ping": "1"}` → its reply carries the nudge.
+5. If that reply has `error` → Show Notification "Countdown sync failed: {error}". Otherwise, if `message` isn't empty → Show Notification `{message}`.
 
 **Automation:** Shortcuts → Automation → Time of Day **1:30 AM** daily → Run Immediately → run "Countdown Sync". It runs after the late-night meal and routines; it's still "today" until 4 AM. Any time works, and a second automation, e.g. 9:30 PM, is fine too.
 
@@ -322,7 +322,7 @@ A web app can't block other apps on iOS; only Screen Time can, and Shortcuts can
 **Shortcut "Food Guard":**
 1. Text: the sync token (the same one).
 2. Get Contents of URL — POST `{}` to `food-guard` with the `Authorization` header.
-3. Get Dictionary Value `blocked`. If it is true:
+3. Get Dictionary Value `message`; it's non-empty exactly when `blocked` is true, and text is simpler to test in Shortcuts. If it has any value:
    - **Go to Home Screen**
    - **Show Notification** `{message}`
 
@@ -398,7 +398,7 @@ Six layers (chose Q13). The first two run in CI on every push. Layers 3–5 run 
    - challenge chips
    - Perfect Day overlay shown once per day
    - Settings validation messages
-3. **End-to-end browser tests** (Playwright, Chromium, phone-sized and desktop-sized) against the app on a local dev server and the real Supabase project, signed in as the test user. The browser clock is pinned with `page.clock`, so time-based states are deterministic. Covers:
+3. **End-to-end browser tests** (Playwright, Chromium, phone-sized and desktop-sized) against the app on a local dev server and the real Supabase project, signed in as the test user. The **app's** clock is pinned through a test-only global (`window.__countdownNow`), so time-based states are deterministic. Supabase auth keeps the real clock, because faking the whole browser clock would make every session token look expired. Covers:
    - login / logout
    - ticking routines → score, rings and wheel update
    - quick-add, saved foods and the time field → totals and ⚠️
