@@ -1,5 +1,5 @@
 import { inWindow } from '@shared/windows';
-import { dailyHabitsOn } from './visibility';
+import { scoredHabitsOn } from './visibility';
 import type { Ctx, Day, Habit, Mode } from './types';
 
 export function onCalorieTarget(day: Day, ctx: Ctx): boolean {
@@ -40,7 +40,7 @@ export interface DayScore {
 }
 
 export function dayScore(habits: readonly Habit[], day: Day, ctx: Ctx): DayScore {
-  const daily = dailyHabitsOn(habits, day);
+  const daily = scoredHabitsOn(habits, day, ctx.history.checks);
   const mode: Mode = day === ctx.today ? 'live' : 'final';
   const done = daily.filter((h) => habitDone(h, day, ctx, mode)).length;
   return { done, total: daily.length, score: daily.length === 0 ? 0 : Math.round((100 * done) / daily.length) };

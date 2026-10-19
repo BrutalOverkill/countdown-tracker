@@ -3,7 +3,7 @@ import { DEFAULT_WINDOWS, type EatingWindow } from '@shared/windows';
 
 export type { Day, EatingWindow };
 
-export type Frequency = 'daily' | 'weekly';
+export type Frequency = 'daily' | 'weekly' | 'interval';
 export type HabitSource = 'manual' | 'steps' | 'calories' | 'workout' | 'fasting';
 export type Slot = 'morning' | 'night' | 'anytime';
 /** 'final' judges a day as finished; 'live' lets today's calories/fasting count while on track. */
@@ -18,6 +18,8 @@ export interface Habit {
   source: HabitSource;
   slot: Slot;
   weekday: number | null;
+  intervalDays: number | null;
+  intervalStart: Day | null;
   sortOrder: number;
   createdDay: Day;
   archivedDay: Day | null;

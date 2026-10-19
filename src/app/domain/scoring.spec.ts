@@ -80,4 +80,13 @@ describe('dayScore', () => {
     expect(isGood({ done: 7, total: 8, score: 88 })).toBe(true);
     expect(isGood({ done: 6, total: 8, score: 75 })).toBe(false);
   });
+
+  it('counts an every-4-days habit only while it is due, until it is ticked', () => {
+    const daily = habit('a');
+    const derma = habit('d', { frequency: 'interval', intervalDays: 4, intervalStart: '2026-10-20' });
+    const c = ctx('2026-10-30', history({ checks: { a: ['2026-10-20', '2026-10-22', '2026-10-25'], d: ['2026-10-20'] } }));
+    expect(dayScore([daily, derma], '2026-10-20', c)).toMatchObject({ done: 2, total: 2 });
+    expect(dayScore([daily, derma], '2026-10-22', c)).toMatchObject({ done: 1, total: 1 });
+    expect(dayScore([daily, derma], '2026-10-25', c)).toMatchObject({ done: 1, total: 2 });
+  });
 });
