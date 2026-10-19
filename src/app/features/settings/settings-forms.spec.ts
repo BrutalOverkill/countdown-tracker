@@ -15,9 +15,9 @@ describe('settings forms', () => {
   });
 
   it('parses a habit, defaulting the emoji and the weekday', () => {
-    expect(parseHabit({ name: ' Hair oil ', emoji: '', frequency: 'weekly', slot: 'night', weekday: '' })).toEqual({ ok: true, value: { name: 'Hair oil', emoji: '✅', frequency: 'weekly', slot: 'night', weekday: 0 } });
-    expect(parseHabit({ name: 'Water', emoji: '💧', frequency: 'daily', slot: 'anytime', weekday: '3' })).toMatchObject({ ok: true, value: { weekday: null } });
-    expect(parseHabit({ name: ' ', emoji: '', frequency: 'daily', slot: 'anytime', weekday: '' })).toEqual({ ok: false, error: 'Give the habit a name (up to 40 characters)' });
+    expect(parseHabit({ name: ' Hair oil ', emoji: '', frequency: 'weekly', slot: 'night', weekday: '', intervalDays: '' })).toEqual({ ok: true, value: { name: 'Hair oil', emoji: '✅', frequency: 'weekly', slot: 'night', weekday: 0, intervalDays: null } });
+    expect(parseHabit({ name: 'Water', emoji: '💧', frequency: 'daily', slot: 'anytime', weekday: '3', intervalDays: '' })).toMatchObject({ ok: true, value: { weekday: null } });
+    expect(parseHabit({ name: ' ', emoji: '', frequency: 'daily', slot: 'anytime', weekday: '', intervalDays: '' })).toEqual({ ok: false, error: 'Give the habit a name (up to 40 characters)' });
   });
 
   it('bounds challenge targets by the days left', () => {
@@ -32,5 +32,12 @@ describe('settings forms', () => {
     expect(moved(['a', 'b', 'c'], 1, -1)).toEqual(['b', 'a', 'c']);
     expect(moved(['a', 'b', 'c'], 1, 1)).toEqual(['a', 'c', 'b']);
     expect(moved(['a', 'b', 'c'], 0, -1)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('parses an every-N-days habit and bounds N to 2–30', () => {
+    expect(parseHabit({ name: 'Dermarolling', emoji: '🪡', frequency: 'interval', slot: 'night', weekday: '', intervalDays: '4' }))
+      .toMatchObject({ ok: true, value: { frequency: 'interval', intervalDays: 4, weekday: null } });
+    expect(parseHabit({ name: 'X', emoji: '', frequency: 'interval', slot: 'night', weekday: '', intervalDays: '1' })).toEqual({ ok: false, error: 'Pick every 2–30 days' });
+    expect(parseHabit({ name: 'X', emoji: '', frequency: 'daily', slot: 'night', weekday: '', intervalDays: '4' })).toMatchObject({ ok: true, value: { intervalDays: null } });
   });
 });

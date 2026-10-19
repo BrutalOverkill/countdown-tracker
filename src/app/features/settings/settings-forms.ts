@@ -22,14 +22,19 @@ export function parseTargets(f: { steps: string; kcal: string }): Parsed<{ stepG
   return { ok: true, value: { stepGoal, kcalGoal } };
 }
 
-export interface HabitForm { name: string; emoji: string; frequency: Frequency; slot: Slot; weekday: string }
+export interface HabitForm { name: string; emoji: string; frequency: Frequency; slot: Slot; weekday: string; intervalDays: string }
 
-export function parseHabit(f: HabitForm): Parsed<{ name: string; emoji: string; frequency: Frequency; slot: Slot; weekday: number | null }> {
+export function parseHabit(f: HabitForm): Parsed<{ name: string; emoji: string; frequency: Frequency; slot: Slot; weekday: number | null; intervalDays: number | null }> {
   const name = f.name.trim();
   if (!name || name.length > 40) return { ok: false, error: 'Give the habit a name (up to 40 characters)' };
+  let intervalDays: number | null = null;
+  if (f.frequency === 'interval') {
+    intervalDays = Number(f.intervalDays);
+    if (!Number.isInteger(intervalDays) || intervalDays < 2 || intervalDays > 30) return { ok: false, error: 'Pick every 2–30 days' };
+  }
   return {
     ok: true,
-    value: { name, emoji: firstChars(f.emoji, 8) || '✅', frequency: f.frequency, slot: f.slot, weekday: f.frequency === 'weekly' ? Number(f.weekday || 0) : null },
+    value: { name, emoji: firstChars(f.emoji, 8) || '✅', frequency: f.frequency, slot: f.slot, weekday: f.frequency === 'weekly' ? Number(f.weekday || 0) : null, intervalDays },
   };
 }
 

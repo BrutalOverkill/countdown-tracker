@@ -89,5 +89,19 @@ describe('Settings sections', () => {
     await settle(fixture);
     expect(day.hidden).toBe(false);
   });
-});
 
+  it('HabitsSection shows the every-N-days field only for that frequency', async () => {
+    TestBed.configureTestingModule({ providers: [{ provide: TrackerApi, useValue: fakeApi() }] });
+    const fixture = TestBed.createComponent(HabitsSection);
+    await settle(fixture);
+    const el = fixture.nativeElement as HTMLElement;
+    const every = el.querySelector('[aria-label="New habit every N days"]') as HTMLInputElement;
+    const freq = el.querySelector('[aria-label="New habit frequency"]') as HTMLSelectElement;
+    expect(every.hidden).toBe(true);
+    freq.value = 'interval';
+    freq.dispatchEvent(new Event('change'));
+    await settle(fixture);
+    expect(every.hidden).toBe(false);
+    expect(every.value).toBe('4');
+  });
+});

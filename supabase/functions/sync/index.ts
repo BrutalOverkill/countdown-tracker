@@ -1,4 +1,4 @@
-import { appDayOf, appToday, istDayOf, weekBlockRange } from '../_shared/days.ts';
+import { addDays, appDayOf, appToday, istDayOf, weekBlockRange } from '../_shared/days.ts';
 import { adminClient, json, ownerForRequest, SERVER_ERROR, TOKEN_ERROR } from '../_shared/http.ts';
 import { messageFor, pendingFor, validatePayload, type ManualHabit } from './logic.ts';
 
@@ -45,16 +45,16 @@ Deno.serve(async (req) => {
     const today = appToday();
     const { start } = weekBlockRange(today);
     const [habits, checks] = await Promise.all([
-      db.from('habits').select('id, name, frequency, weekday, sort_order, created_at')
+      db.from('habits').select('id, name, frequency, weekday, interval_days, interval_start, sort_order, created_at')
         .eq('user_id', owner.userId).eq('source', 'manual').is('archived_at', null),
-      db.from('habit_checks').select('habit_id, day').eq('user_id', owner.userId).gte('day', start).lte('day', today),
+      db.from('habit_checks').select('habit_id, day').eq('user_id', owner.userId).gte('day', [start, addDays(today, -30)].sort()[0]).lte('day', today),
     ]);
     if (habits.error) throw habits.error;
     if (checks.error) throw checks.error;
     const manual: ManualHabit[] = (habits.data ?? [])
       .filter((h) => appDayOf(new Date(h.created_at)) <= today)
       .map((h) => ({
-        name: h.name, frequency: h.frequency, weekday: h.weekday, sortOrder: h.sort_order,
+        name: h.name, frequency: h.frequency, weekday: h.weekday, intervalDays: h.interval_days, intervalStart: h.interval_start, sortOrder: h.sort_order,
         checkedDays: (checks.data ?? []).filter((c) => c.habit_id === h.id).map((c) => c.day),
       }));
     const pending = pendingFor(today, manual);

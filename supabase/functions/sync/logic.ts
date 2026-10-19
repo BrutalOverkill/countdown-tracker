@@ -1,4 +1,5 @@
 import { addDays, appDayOf, isValidDay, weekBlockRange, weekdayOf, type Day } from '../_shared/days.ts';
+import { isDueOn } from '../_shared/interval.ts';
 
 export interface StepIn { date: Day; count: number }
 export interface WorkoutIn { start: string; durationMin: number | null; name: string | null }
@@ -60,8 +61,10 @@ export function validatePayload(body: unknown, latestDay: Day): Validated {
 
 export interface ManualHabit {
   name: string;
-  frequency: 'daily' | 'weekly';
+  frequency: 'daily' | 'weekly' | 'interval';
   weekday: number | null;
+  intervalDays: number | null;
+  intervalStart: Day | null;
   sortOrder: number;
   checkedDays: readonly Day[];
 }
@@ -71,6 +74,9 @@ export function pendingFor(today: Day, habits: readonly ManualHabit[]): string[]
   return [...habits]
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .filter((h) => {
+      if (h.frequency === 'interval') {
+        return h.intervalDays !== null && h.intervalStart !== null && !h.checkedDays.includes(today) && isDueOn(today, h.intervalStart, h.intervalDays, h.checkedDays);
+      }
       if (h.frequency === 'daily') return !h.checkedDays.includes(today);
       if (h.weekday !== weekdayOf(today)) return false;
       return !h.checkedDays.some((d) => d >= start && d <= end);

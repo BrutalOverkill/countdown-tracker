@@ -29,12 +29,14 @@ const SLOT_LABEL: Record<Slot, string> = { morning: 'morning', night: 'night', a
                   <select #eFreq class="field min-w-0 flex-1" aria-label="Frequency" (change)="editFreq.set(eFreq.value)">
                     <option value="daily" [selected]="h.frequency === 'daily'">Daily</option>
                     <option value="weekly" [selected]="h.frequency === 'weekly'">Weekly</option>
+                    <option value="interval" [selected]="h.frequency === 'interval'">Every N days</option>
                   </select>
                   <select #eSlot class="field min-w-0 flex-1" aria-label="Time of day">
                     @for (s of slots; track s) {
                       <option [value]="s" [selected]="h.slot === s">{{ slotLabel[s] }}</option>
                     }
                   </select>
+                  <input #eEvery class="field min-w-0 !w-20" type="number" min="2" max="30" [value]="h.intervalDays ?? 4" aria-label="Every N days" [hidden]="editFreq() !== 'interval'" />
                   <select #eDay class="field min-w-0 flex-1" aria-label="Weekday (weekly habits)" [hidden]="editFreq() !== 'weekly'">
                     @for (d of weekdays; track $index) {
                       <option [value]="$index" [selected]="$index === (h.weekday ?? 0)">{{ d }}</option>
@@ -47,7 +49,7 @@ const SLOT_LABEL: Record<Slot, string> = { morning: 'morning', night: 'night', a
                       [class.ring-2]="color() === c" [class.ring-white]="color() === c" (click)="color.set(c)"></button>
                   }
                 </div>
-                <button type="button" class="btn" (click)="save(h, eName.value, eEmoji.value, eFreq.value, eSlot.value, eDay.value)">Save</button>
+                <button type="button" class="btn" (click)="save(h, eName.value, eEmoji.value, eFreq.value, eSlot.value, eDay.value, eEvery.value)">Save</button>
               } @else {
                 <p class="muted w-full">{{ h.emoji }} {{ h.name }} fills in automatically, so only its position can change.</p>
               }
@@ -65,18 +67,19 @@ const SLOT_LABEL: Record<Slot, string> = { morning: 'morning', night: 'night', a
           }
         </div>
       }
-      <form class="mt-2 grid gap-1.5 border-t border-line pt-2" (submit)="add($event, nName, nEmoji, nFreq, nSlot, nDay)">
+      <form class="mt-2 grid gap-1.5 border-t border-line pt-2" (submit)="add($event, nName, nEmoji, nFreq, nSlot, nDay, nEvery)">
         <div class="flex gap-1.5">
           <input #nEmoji class="field !w-14 shrink-0 text-center" placeholder="✅" maxlength="8" aria-label="New habit emoji" />
           <input #nName class="field min-w-0 flex-1" placeholder="+ Add habit" maxlength="40" aria-label="New habit name" />
         </div>
         <div class="flex gap-1.5">
-          <select #nFreq class="field min-w-0 flex-1" aria-label="New habit frequency" (change)="newFreq.set(nFreq.value)"><option value="daily">Daily</option><option value="weekly">Weekly</option></select>
+          <select #nFreq class="field min-w-0 flex-1" aria-label="New habit frequency" (change)="newFreq.set(nFreq.value)"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="interval">Every N days</option></select>
           <select #nSlot class="field min-w-0 flex-1" aria-label="New habit time of day">
             @for (s of slots; track s) {
               <option [value]="s" [selected]="s === 'anytime'">{{ slotLabel[s] }}</option>
             }
           </select>
+          <input #nEvery class="field min-w-0 !w-20" type="number" min="2" max="30" value="4" aria-label="New habit every N days" [hidden]="newFreq() !== 'interval'" />
           <select #nDay class="field min-w-0 flex-1" aria-label="New habit weekday" [hidden]="newFreq() !== 'weekly'">
             @for (d of weekdays; track $index) {
               <option [value]="$index">{{ d }}</option>
@@ -112,6 +115,7 @@ export class HabitsSection {
 
   protected meta(h: Habit): string {
     if (h.source !== 'manual') return 'Auto ⚡';
+    if (h.frequency === 'interval') return `Every ${h.intervalDays} days`;
     return h.frequency === 'weekly' ? `Weekly · ${WEEKDAYS[h.weekday ?? 0].slice(0, 3)}` : `Daily · ${SLOT_LABEL[h.slot]}`;
   }
 
@@ -122,23 +126,26 @@ export class HabitsSection {
     this.editing.set(h.id);
   }
 
-  protected async save(h: Habit, name: string, emoji: string, frequency: string, slot: string, weekday: string): Promise<void> {
-    const parsed = parseHabit({ name, emoji, frequency: frequency as Frequency, slot: slot as Slot, weekday });
+  protected async save(h: Habit, name: string, emoji: string, frequency: string, slot: string, weekday: string, intervalDays: string): Promise<void> {
+    const parsed = parseHabit({ name, emoji, frequency: frequency as Frequency, slot: slot as Slot, weekday, intervalDays });
     if (!parsed.ok) return this.error.set(parsed.error);
     this.error.set(null);
     const v = parsed.value;
-    if (await this.store.guard(() => this.api.updateHabit(h.id, { ...v, color: this.color(), source: h.source, sortOrder: h.sortOrder }))) this.editing.set(null);
+    // Switching to "every N days" starts the cycle today; staying on it keeps the current cycle.
+    const intervalStart = v.frequency !== 'interval' ? null : h.frequency === 'interval' ? h.intervalStart : this.store.today();
+    if (await this.store.guard(() => this.api.updateHabit(h.id, { ...v, intervalStart, color: this.color(), source: h.source, sortOrder: h.sortOrder }))) this.editing.set(null);
   }
 
-  protected async add(event: Event, name: HTMLInputElement, emoji: HTMLInputElement, freq: HTMLSelectElement, slot: HTMLSelectElement, day: HTMLSelectElement): Promise<void> {
+  protected async add(event: Event, name: HTMLInputElement, emoji: HTMLInputElement, freq: HTMLSelectElement, slot: HTMLSelectElement, day: HTMLSelectElement, every: HTMLInputElement): Promise<void> {
     event.preventDefault();
-    const parsed = parseHabit({ name: name.value, emoji: emoji.value, frequency: freq.value as Frequency, slot: slot.value as Slot, weekday: day.value });
+    const parsed = parseHabit({ name: name.value, emoji: emoji.value, frequency: freq.value as Frequency, slot: slot.value as Slot, weekday: day.value, intervalDays: every.value });
     if (!parsed.ok) return this.error.set(parsed.error);
     this.error.set(null);
     const habits = this.store.habits();
     const sortOrder = Math.max(0, ...habits.map((h) => h.sortOrder)) + 1;
     const color = nextColor(habits.filter((h) => h.archivedDay === null).map((h) => h.color));
-    if (await this.store.guard(() => this.api.addHabit({ ...parsed.value, color, source: 'manual', sortOrder }))) {
+    const intervalStart = parsed.value.frequency === 'interval' ? this.store.today() : null;
+    if (await this.store.guard(() => this.api.addHabit({ ...parsed.value, intervalStart, color, source: 'manual', sortOrder }))) {
       name.value = '';
       emoji.value = '';
     }

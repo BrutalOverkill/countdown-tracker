@@ -80,7 +80,7 @@ export class FastingSection {
       if (on && active.length === 0) {
         await this.api.addHabit({
           name: 'Fasting windows kept', emoji: '🌙', color: nextColor(habits.map((h) => h.color)), frequency: 'daily',
-          source: 'fasting', slot: 'anytime', weekday: null, sortOrder: Math.max(0, ...habits.map((h) => h.sortOrder)) + 1,
+          source: 'fasting', slot: 'anytime', weekday: null, intervalDays: null, intervalStart: null, sortOrder: Math.max(0, ...habits.map((h) => h.sortOrder)) + 1,
         });
       }
       if (!on) for (const h of active) await this.api.archiveHabit(h.id);

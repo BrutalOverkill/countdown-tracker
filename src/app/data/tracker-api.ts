@@ -11,7 +11,7 @@ import {
 import { selectAll } from './select-all';
 
 export interface NewFood { day: Day; eatenAt: string; name: string; kcal: number; proteinG: number | null; savedFoodId: string | null }
-export interface NewHabit { name: string; emoji: string; color: string; frequency: Frequency; source: HabitSource; slot: Slot; weekday: number | null; sortOrder: number }
+export interface NewHabit { name: string; emoji: string; color: string; frequency: Frequency; source: HabitSource; slot: Slot; weekday: number | null; intervalDays: number | null; intervalStart: Day | null; sortOrder: number }
 
 function must<T>(result: { data: T; error: unknown }): T {
   if (result.error) throw result.error;
@@ -122,11 +122,11 @@ export class TrackerApi {
   }
 
   async addHabit(h: NewHabit): Promise<void> {
-    must(await this.db.from('habits').insert({ name: h.name, emoji: h.emoji, color: h.color, frequency: h.frequency, source: h.source, slot: h.slot, weekday: h.weekday, sort_order: h.sortOrder }));
+    must(await this.db.from('habits').insert({ name: h.name, emoji: h.emoji, color: h.color, frequency: h.frequency, source: h.source, slot: h.slot, weekday: h.weekday, interval_days: h.intervalDays, interval_start: h.intervalStart, sort_order: h.sortOrder }));
   }
 
   async updateHabit(id: string, h: NewHabit): Promise<void> {
-    must(await this.db.from('habits').update({ name: h.name, emoji: h.emoji, color: h.color, frequency: h.frequency, slot: h.slot, weekday: h.weekday }).eq('id', id));
+    must(await this.db.from('habits').update({ name: h.name, emoji: h.emoji, color: h.color, frequency: h.frequency, slot: h.slot, weekday: h.weekday, interval_days: h.intervalDays, interval_start: h.intervalStart }).eq('id', id));
   }
 
   async archiveHabit(id: string): Promise<void> {

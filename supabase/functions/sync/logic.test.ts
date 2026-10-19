@@ -73,19 +73,26 @@ describe('validatePayload', () => {
 });
 
 describe('pendingFor', () => {
-  const daily = (name: string, sortOrder: number, checkedDays: string[] = []) => ({ name, frequency: 'daily' as const, weekday: null, sortOrder, checkedDays });
+  const daily = (name: string, sortOrder: number, checkedDays: string[] = []) => ({ name, frequency: 'daily' as const, weekday: null, intervalDays: null, intervalStart: null, sortOrder, checkedDays });
 
   it('lists unticked daily habits in sort order', () => {
     expect(pendingFor('2026-10-19', [daily('PM skincare', 6), daily('AM skincare', 5, ['2026-10-19']), daily('Minoxidil PM', 8)])).toEqual(['PM skincare', 'Minoxidil PM']);
   });
 
   it('nudges a weekly habit only on its weekday and only if not done in the week block', () => {
-    const derma = (checkedDays: string[], weekday: number | null = 0) => ({ name: 'Dermarolling', frequency: 'weekly' as const, weekday, sortOrder: 9, checkedDays });
+    const derma = (checkedDays: string[], weekday: number | null = 0) => ({ name: 'Dermarolling', frequency: 'weekly' as const, weekday, intervalDays: null, intervalStart: null, sortOrder: 9, checkedDays });
     expect(pendingFor('2026-10-18', [derma([])])).toEqual(['Dermarolling']); // Sunday, block 15–21
     expect(pendingFor('2026-10-18', [derma(['2026-10-15'])])).toEqual([]);
     expect(pendingFor('2026-10-18', [derma(['2026-10-14'])])).toEqual(['Dermarolling']); // previous block
     expect(pendingFor('2026-10-19', [derma([])])).toEqual([]); // Monday
     expect(pendingFor('2026-10-18', [derma([], null)])).toEqual([]);
+  });
+
+  it('lists an every-N-days habit when it is due and not ticked today', () => {
+    const derma = (checkedDays: string[]) => ({ name: 'Dermarolling', frequency: 'interval' as const, weekday: null, intervalDays: 4, intervalStart: '2026-10-20', sortOrder: 9, checkedDays });
+    expect(pendingFor('2026-10-24', [derma(['2026-10-20'])])).toEqual(['Dermarolling']);
+    expect(pendingFor('2026-10-23', [derma(['2026-10-20'])])).toEqual([]);
+    expect(pendingFor('2026-10-24', [derma(['2026-10-20', '2026-10-24'])])).toEqual([]);
   });
 });
 
