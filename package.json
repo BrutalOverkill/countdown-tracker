@@ -7,7 +7,11 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "test:functions": "vitest run --config vitest.functions.config.ts --passWithNoTests"
+    "test:functions": "vitest run --config vitest.functions.config.ts --passWithNoTests",
+    "test:e2e": "playwright test",
+    "test:security": "node scripts/live/security-check.mjs",
+    "test:functions-live": "node scripts/live/functions-check.mjs",
+    "test:live": "node scripts/live/setup-check.mjs && npm run test:security && npm run test:functions-live && npm run test:e2e"
   },
   "private": true,
   "packageManager": "npm@11.13.0",
