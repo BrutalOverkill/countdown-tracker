@@ -13,7 +13,7 @@ test('ticking routines updates the score, rings and wheel, and survives a reload
   await expect(page.getByLabel('Routines')).toContainText('1/4');
   await page.getByRole('button', { name: 'Trained today ✓' }).click();
   await expect(page.getByLabel('Workout')).toContainText('Trained');
-  await expect(page.getByLabel("Today's score")).toContainText('2 of 8 done');
+  await expect(page.getByLabel("Today's score")).toContainText('2 of 9 done');
 
   await page.reload();
   await expect(page.getByRole('checkbox', { name: /AM skincare/ })).toHaveAttribute('aria-checked', 'true');
