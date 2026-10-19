@@ -8,7 +8,7 @@ Run on the iPhone after setup. Tick each case; note anything that doesn't match 
 | 2 | Offline launch | Airplane mode on, open the app | App opens with "You're offline — connect to load your data" and a Retry button (no data is stored on the phone); airplane mode off → Retry loads everything |
 | 2b | Signal drops while open | With the app open, airplane mode on | Data stays on screen with "Offline — changes won't save"; ticks are disabled |
 | 3 | Sync by tap | Today → ↻ Sync iPhone | Shortcuts runs Countdown Sync; back in the app, steps match the Health app; "Steps synced <now>" |
-| 4 | Workout | Log a workout in Strong, then ↻ Sync | Today's workout card shows it with its duration |
+| 4 | Workout | After a Strong session, tap **Trained today ✓** on Today | The Workout habit ticks and the card shows "Trained" |
 | 5 | Nudge | Leave PM skincare unticked, run Countdown Sync | Notification "Left today: PM skincare, …" |
 | 6 | No nudge | Tick everything, run Countdown Sync | No notification |
 | 7 | Nightly automation | Leave it overnight | A sync ran at 1:30 AM (Settings → Shortcut status shows the time) |

@@ -1,5 +1,7 @@
 # iPhone setup
 
+> **Workouts:** on Anvit's iPhone (checked 20 Oct 2026) Shortcuts can't read Workouts from Apple Health, so skip steps 5–6 below. After a Strong session, tap **Trained today ✓** on Today instead.
+
 You need: the Countdown app open in Safari on the iPhone, and a **sync token** from Countdown → Settings → iPhone Shortcut → Generate token (copy it).
 
 ## 1. Install the app
@@ -20,7 +22,7 @@ Shortcuts app → **+** → tap the name at the top → **Countdown Sync**. Add 
       - Request Body **JSON**: add field `steps` of type **Dictionary** with two fields: `date` (Text) = *Formatted Date*, `count` (Number) = *Repeat Item* (Value).
    3. **Get Dictionary Value** → key `error` in *Contents of URL* → **If** it **has any value** → **Show Notification** `Countdown sync failed: ` + *Dictionary Value* → **Stop This Shortcut** → **End If**. (A failed day must not hide behind a later successful nudge. Re-running the Shortcut is always safe: nothing gets duplicated.)
 4. **End Repeat** (added automatically).
-5. *(Only if your phone can read Workouts — see Task 0)* **Find Health Samples** → Type **Workouts** → Start Date **is in the last 2 days**.
+5. *(Only if Find Health Samples offers a **Workouts** type on your phone)* **Find Health Samples** → Type **Workouts** → Start Date **is in the last 2 days**.
 6. **Repeat with Each** (those samples). Inside:
    1. **Format Date** → *Repeat Item → Start Date* → **ISO 8601**, Include Time on.
    2. **Get Time Between Dates** → from *Repeat Item → Start Date* to *Repeat Item → End Date* → **Minutes**.
