@@ -31,12 +31,13 @@ A personal tracker for Anvit, used on the iPhone (installed to the home screen) 
 | Stack | Angular + Tailwind, Supabase (DB + login + one function), GitHub Pages | chose (Q6) |
 | Repo | Public, personal GitHub account `BrutalOverkill`, app name **Countdown** | chose (Q7) |
 | Game layer | Daily score + Perfect Days + streak with a weekly freeze; countdown challenges + report card | chose (Q8, mockups) |
+| Food Guard | Once today's calories reach the target, opening a food app (or the App Store) sends you straight back to the home screen — hard close, no "open anyway" | chose (Q9) |
 | Timezone | All "days" are India time (`Asia/Kolkata`) | assumed, confirmed |
 | Calories "on target" | At least one food logged that day **and** total ≤ target | assumed, confirmed |
 
 ## 3. Scope
 
-**In v1:** the four screens below, the game layer (§4.6), the sync function, the iPhone Shortcut (with written setup steps), login, auto-deploy, installable PWA.
+**In v1:** the four screens below, the game layer (§4.6), the sync function, the iPhone Shortcut (with written setup steps), the Food Guard (§9.1), login, auto-deploy, installable PWA.
 
 **Not in v1** (can be added later): food database search, set/rep detail from Strong, per-routine timed push notifications, offline editing, charts beyond wheel/grid/streaks, multiple users, XP/levels/self-set rewards, badges.
 
@@ -135,7 +136,7 @@ Email + password screen, shown when there's no session. **New sign-ups are disab
 | Part | What it is |
 |---|---|
 | **Web app** | Angular (current stable, standalone components + signals, zoneless — same setup as the Kumkum site), Tailwind CSS 4, `@angular/service-worker` for installability and caching the app shell. `supabase-js` v2 for login and data. Served from GitHub Pages at `https://brutaloverkill.github.io/countdown-tracker/`. |
-| **Supabase** | Free tier, region Mumbai (`ap-south-1`). Postgres + Auth + one Edge Function `sync`. |
+| **Supabase** | Free tier, region Mumbai (`ap-south-1`). Postgres + Auth + two Edge Functions: `sync` (§7) and `food-guard` (§7.1). |
 | **iPhone Shortcut** | "Countdown Sync" — reads Apple Health, POSTs to `sync`, shows a notification from the reply. Run by a daily personal automation (default 9:30 PM, "Run Immediately") and by the ↻ Sync iPhone button. |
 | **GitHub** | Repo + GitHub Actions: on push to `main`, run tests, build, and deploy to Pages. SPA routing via a copied `404.html`. |
 
@@ -194,6 +195,20 @@ Behaviour:
 ```
 
 `message` is `""` when nothing is pending. Any unexpected error → `500 {"error":"Server error — try again later"}`. Every failure reply has an `error` key, so the Shortcut can check for it.
+
+### 7.1 Food Guard function
+
+`POST https://<project>.supabase.co/functions/v1/food-guard` — JWT verification off. It uses the same `Authorization: Bearer <sync token>` and the same token check and 401 reply as `sync`. The body is ignored (the Shortcut sends `{}`). It does **not** touch `last_sync_at`.
+
+- Today = current IST date (server side). `kcal` = sum of today's `food_entries.kcal`; `goal` = `settings.kcal_goal`.
+- `reached` = `kcal ≥ goal` (so exactly on target counts as reached).
+- Reply `200`:
+
+```json
+{ "kcal": 2050, "goal": 2000, "reached": true, "message": "🛑 2,050 kcal today — target hit. Kitchen's closed." }
+```
+
+  When not reached: `"reached": false`, `"message": ""`. Errors use the same `error` shapes as `sync`.
 
 ## 8. Rules (derived, not stored)
 
@@ -264,6 +279,24 @@ If Workouts can't be read, the Shortcut sends steps only, and the workout card r
 
 **Automation:** Shortcuts → Automation → Time of Day 9:30 PM daily → Run Immediately → run "Countdown Sync".
 
+### 9.1 Food Guard (hard close)
+
+A web app can't block other apps on iOS; only Screen Time can, and Shortcuts can't toggle Screen Time. The guard uses an **App-opened automation** instead. It adds friction, not a lock: it can be switched off in Shortcuts, and it doesn't cover ordering in Safari.
+
+**Shortcut "Food Guard":**
+1. Text: the sync token (the same one).
+2. Get Contents of URL — POST `{}` to `food-guard` with the `Authorization` header.
+3. Get Dictionary Value `reached`. If it is true:
+   - **Go to Home Screen**
+   - **Show Notification** `{message}`
+
+   Otherwise, do nothing.
+4. If the request fails or the reply has an `error` key, do nothing, so the app opens normally. It fails open: a server problem never locks you out.
+
+**Automation:** Shortcuts → Automation → **App** → "Is Opened" → choose the food apps, e.g. Swiggy, Zomato, Zepto, Blinkit, Domino's and McDonald's, plus the **App Store** (so food apps can't be reinstalled once you're at target) → Run Immediately → run "Food Guard". Turn "Notify When Run" off.
+
+Depends on food being logged in the app: with nothing logged, `kcal` is 0 and nothing is blocked.
+
 ## 10. Errors and edge cases
 
 | Situation | Behaviour |
@@ -278,6 +311,8 @@ If Workouts can't be read, the Shortcut sends steps only, and the workout card r
 | Countdown date passed | Hidden from Today, listed under "Past" in Settings |
 | Supabase free project paused (after 7 days with no activity) | Prevented by the daily sync; if it happens, "Restore" in the Supabase dashboard (documented in README) |
 | Sync token leaked / phone lost | Rotate token in Settings; the old one stops working immediately |
+| Food Guard can't reach the server (offline, error) | Does nothing; the food app opens normally (fails open) |
+| Token rotated but Food Guard still has the old one | 401 → Food Guard does nothing; Settings' setup steps remind you to paste the new token into **both** shortcuts |
 
 ## 11. Security
 
@@ -305,6 +340,7 @@ If Workouts can't be read, the Shortcut sends steps only, and the workout card r
   - steps upsert overwrites
   - workout de-duplication
   - pending/message builder
+  - Food Guard result: below / exactly at / above the goal, and no entries
 - **RLS check:** a script signs in as a second test user and confirms it can read and write none of the owner's rows.
 - **Browser check:** every screen exercised in a real browser on the PC (phone-sized and desktop-sized) before calling it done.
 - **On-device check (Anvit):** install to home screen, build the Shortcut, run it once, confirm steps/workout appear and the nudge shows.
@@ -313,7 +349,7 @@ If Workouts can't be read, the Shortcut sends steps only, and the workout card r
 
 1. Create a free Supabase account and a project ("countdown", region Mumbai). Share the project URL, and run `npx supabase login` once so the CLI can deploy.
 2. After first deploy: create the owner login (email + password), then sign-ups get switched off.
-3. On the iPhone: open the site in Safari → Share → Add to Home Screen; build the Shortcut and the 9:30 PM automation from the written steps.
+3. On the iPhone: open the site in Safari → Share → Add to Home Screen; build the Shortcut and the 9:30 PM automation from the written steps; build the Food Guard shortcut and its App-opened automation.
 
 ## 14. Risks to verify early
 
