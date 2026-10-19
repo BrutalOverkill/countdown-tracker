@@ -1,5 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { addDays, type Day } from '@shared/days';
+import { MAX_INTERVAL_DAYS } from '@shared/interval';
 import { Clock } from '../core/clock';
 import { Online } from '../core/online';
 import { OFFLINE, SAVE_FAILED, ToastService } from '../core/toast.service';
@@ -80,7 +81,8 @@ export class TrackerStore {
     await this.reloadConfig(gen);
     if (gen !== this.generation) return;
     const today = this.today();
-    const from = [addDays(today, -180), ...this.countdowns().map((c) => c.createdDay)].sort()[0];
+    // Extra lookback so an every-N-days habit's last tick before the window is still known.
+    const from = addDays([addDays(today, -180), ...this.countdowns().map((c) => c.createdDay)].sort()[0], -MAX_INTERVAL_DAYS);
     const rows = await this.api.loadHistory(from, today);
     if (gen !== this.generation) return;
     this.history.set(buildHistory(rows));
@@ -111,13 +113,14 @@ export class TrackerStore {
   }
 
   async ensureHistoryFrom(from: Day): Promise<void> {
-    if (this.loadedFrom !== null && from >= this.loadedFrom) return;
+    const start = addDays(from, -MAX_INTERVAL_DAYS);
+    if (this.loadedFrom !== null && start >= this.loadedFrom) return;
     const gen = this.generation;
     const to = this.loadedFrom ? addDays(this.loadedFrom, -1) : this.today();
-    const rows = await this.api.loadHistory(from, to);
+    const rows = await this.api.loadHistory(start, to);
     if (gen !== this.generation) return;
     this.history.update((h) => mergeHistory(buildHistory(rows), h));
-    this.loadedFrom = from;
+    this.loadedFrom = start;
   }
 
   async toggleCheck(habitId: string, day: Day): Promise<void> {

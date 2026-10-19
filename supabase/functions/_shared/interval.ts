@@ -1,5 +1,8 @@
 // "Every N days" habits (spec §8.5). Import-free: the app and the Edge Functions both load this file.
 
+/** The longest allowed interval; history is read this far back before any window so the last tick is visible. */
+export const MAX_INTERVAL_DAYS = 30;
+
 const plusDays = (day: string, n: number) => new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
 /** The day the habit is next due, judged on `day`: the latest tick before `day` (on/after `start`) plus N, else `start`. */

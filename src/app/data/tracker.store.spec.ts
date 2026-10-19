@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { addDays } from '@shared/days';
 import { ToastService } from '../core/toast.service';
 import { TrackerApi } from './tracker-api';
 import { TrackerStore } from './tracker.store';
@@ -128,5 +129,18 @@ describe('TrackerStore', () => {
     const { store } = setup({ setCheck: vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('down')) });
     await Promise.all([store.toggleCheck('h1', '2026-10-19'), store.toggleCheck('h1', '2026-10-19')]);
     expect(store.history().checks.get('h1')?.has('2026-10-19') ?? false).toBe(true);
+  });
+
+  it('loads 30 days before each history window so every-N-days habits can see their last tick', async () => {
+    const loadHistory = vi.fn().mockResolvedValue(emptyRows);
+    const { store } = setup({ ensureSetup: vi.fn().mockResolvedValue(undefined), loadConfig: vi.fn().mockResolvedValue(config), loadHistory });
+    await store.load('user-a');
+    const today = store.today();
+    expect(loadHistory).toHaveBeenLastCalledWith(addDays(today, -210), today);
+    await store.ensureHistoryFrom(addDays(today, -400));
+    expect(loadHistory).toHaveBeenLastCalledWith(addDays(today, -430), addDays(today, -211));
+    loadHistory.mockClear();
+    await store.ensureHistoryFrom(addDays(today, -400));
+    expect(loadHistory).not.toHaveBeenCalled();
   });
 });
