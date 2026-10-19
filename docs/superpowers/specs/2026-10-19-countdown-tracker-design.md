@@ -41,7 +41,7 @@ A personal tracker for Anvit, used on the iPhone (installed to the home screen) 
 
 **In v1:** the four screens below, the game layer (§4.6), intermittent fasting (§4.1 fasting card, §4.3, §4.4, §8.4), the sync function, the iPhone Shortcut (with written setup steps), the Food Guard (§9.1), login, auto-deploy, installable PWA.
 
-**Not in v1** (can be added later): food database search, set/rep detail from Strong, per-routine timed push notifications, offline editing, charts beyond wheel/grid/streaks, multiple users, XP/levels/self-set rewards, badges.
+**Not in v1** (can be added later): food database search, set/rep detail from Strong, per-routine timed push notifications, offline editing, **offline data** (nothing private is stored on the device; opening the app offline shows a "connect to load" screen — chose Q14 after review), charts beyond wheel/grid/streaks, multiple users, XP/levels/self-set rewards, badges.
 
 ## 4. Screens
 
@@ -149,7 +149,7 @@ Email + password screen, shown when there's no session. **New sign-ups are disab
 
 | Part | What it is |
 |---|---|
-| **Web app** | Angular (current stable, standalone components + signals, zoneless — same setup as the Kumkum site), Tailwind CSS 4, `@angular/service-worker` for installability and caching the app shell. `supabase-js` v2 for login and data. Served from GitHub Pages at `https://brutaloverkill.github.io/countdown-tracker/`. |
+| **Web app** | Angular (current stable, standalone components + signals, zoneless — same setup as the Kumkum site), Tailwind CSS 4, `@angular/service-worker` for installability and caching the app shell only (no API responses are cached). `supabase-js` v2 for login and data. Served from GitHub Pages at `https://brutaloverkill.github.io/countdown-tracker/`. |
 | **Supabase** | Free tier, region Mumbai (`ap-south-1`). Postgres + Auth + two Edge Functions: `sync` (§7) and `food-guard` (§7.1). |
 | **iPhone Shortcut** | "Countdown Sync" — reads Apple Health, POSTs to `sync`, shows a notification from the reply. Run by a daily personal automation (default 1:30 AM, "Run Immediately") and by the ↻ Sync iPhone button. Plus a second Shortcut, "Food Guard", run by an App-opened automation (§9.1). |
 | **GitHub** | Repo + GitHub Actions: on push to `main`, run tests, build, and deploy to Pages. SPA routing via a copied `404.html`. |
@@ -310,24 +310,34 @@ If Workouts can't be read, the Shortcut sends steps only, and the workout card r
 1. Text: the sync token (pasted from Settings).
 2. Find Health Samples — Steps, last 7 days, grouped by day → for each: POST `{"steps": {"date": yyyy-MM-dd, "count": n}}`.
 3. Find Health Samples — Workouts, last 2 days → for each: POST `{"workouts": {"start": ISO 8601, "durationMin": n, "name": type}}`.
-4. A final POST `{"ping": "1"}` → its reply carries the nudge.
-5. If that reply has `error` → Show Notification "Countdown sync failed: {error}". Otherwise, if `message` isn't empty → Show Notification `{message}`.
+4. After **every** POST in steps 2–3: if the reply has `error` → Show Notification "Countdown sync failed: {error}" and **Stop This Shortcut**, so a failed day never hides behind a later successful nudge.
+5. A final POST `{"ping": "1"}` → its reply carries the nudge.
+6. If that reply has `error` → Show Notification "Countdown sync failed: {error}". Otherwise, if `message` isn't empty → Show Notification `{message}`.
+
+Partial runs are safe. Earlier requests may already be saved when a later one fails. Re-running the Shortcut re-sends everything, and the upserts converge with no duplicates. Each step POST **replaces** that day's total, because Health gives complete daily aggregates.
 
 **Automation:** Shortcuts → Automation → Time of Day **1:30 AM** daily → Run Immediately → run "Countdown Sync". It runs after the late-night meal and routines; it's still "today" until 4 AM. Any time works, and a second automation, e.g. 9:30 PM, is fine too.
 
 ### 9.1 Food Guard (hard close)
 
-A web app can't block other apps on iOS; only Screen Time can, and Shortcuts can't toggle Screen Time. The guard uses an **App-opened automation** instead. It adds friction, not a lock: it can be switched off in Shortcuts, and it doesn't cover ordering in Safari.
+A web app can't block other apps on iOS; only Screen Time can, and Shortcuts can't toggle Screen Time. The guard uses an **App-opened automation** instead. It is a **deterrent, not an app lock**:
+- it can be switched off in Shortcuts
+- newly installed apps aren't covered until ticked
+- it doesn't cover ordering in Safari
+- it can't decide without the server
+
+A real lock would need a native app using Apple's Screen Time APIs and an Apple-approved entitlement, which is out of scope.
 
 **Shortcut "Food Guard":**
 1. Text: the sync token (the same one).
 2. Get Contents of URL — POST `{}` to `food-guard` with the `Authorization` header.
-3. Get Dictionary Value `message`; it's non-empty exactly when `blocked` is true, and text is simpler to test in Shortcuts. If it has any value:
+3. Get Dictionary Value `error`. If it has any value → **Show Notification** "Food Guard couldn't check: {error}" and leave the app open. This is the **unknown** state: never shown as allowed or blocked.
+4. Otherwise get Dictionary Value `message`; it's non-empty exactly when `blocked` is true, and text is simpler to test in Shortcuts. If it has any value:
    - **Go to Home Screen**
    - **Show Notification** `{message}`
 
-   Otherwise, do nothing.
-4. If the request fails or the reply has an `error` key, do nothing, so the app opens normally. It fails open: a server problem never locks you out.
+   Otherwise (allowed), do nothing.
+5. If the request itself fails (no network), Shortcuts shows its own error and the app opens. It fails open: a server problem never locks you out.
 
 **Automation:** Shortcuts → Automation → **App** → "Is Opened" → choose the food apps, e.g. Swiggy, Zomato, Zepto, Blinkit, Domino's and McDonald's, plus the **App Store** (so food apps can't be installed while blocked) → Run Immediately → run "Food Guard". Turn "Notify When Run" off.
 - Shortcuts can't select the App Store's "Food & Drink" category, so each app is ticked once, by hand. A newly installed food app needs adding to the automation.
@@ -344,15 +354,20 @@ What blocks:
 | Sync fails (offline, server down, bad token) | Shortcut shows "Countdown sync failed: …"; app shows amber "Steps synced …" after 24 h |
 | Missed evening sync | The next sync re-sends the last 7 days; upserts fill the gap |
 | Same workout synced twice | Unique `started_at` → no duplicate |
-| App opened offline | App shell loads from cache, showing last-loaded data; banner "Offline — changes won't save"; tick/add controls disabled |
-| Session expired | Silent token refresh by `supabase-js`; if that fails → login screen |
+| App opened offline | App shell loads from cache. No data is stored on the device, so it shows "You're offline — connect to load your data" with **Retry**. |
+| Signal lost while the app is open | Data already loaded stays on screen; banner "Offline — changes won't save"; tick/add controls disabled |
+| Data fails to load (server error) | "Couldn't load your data" with **Retry** — never an endless "Loading…" |
+| Session expired | Silent token refresh by `supabase-js`; if that fails → all in-memory data is cleared, then the login screen |
+| Sign out, or a different account signs in | All in-memory data, pending writes and in-flight loads from the previous session are discarded before anything renders |
+| Double-tap on a save button | Buttons are disabled while a save is in flight; a second submit is ignored |
 | Invalid input in app | Inline message; nothing saved (same limits as DB checks) |
 | Habit removed | Archived, history kept; disappears from Today and from months after archiving |
 | Countdown date passed | Hidden from Today, listed under "Past" in Settings |
 | Supabase free project paused (after 7 days with no activity) | Prevented by the daily sync; if it happens, "Restore" in the Supabase dashboard (documented in README) |
 | Sync token leaked / phone lost | Rotate token in Settings; the old one stops working immediately |
 | Food Guard can't reach the server (offline, error) | Does nothing; the food app opens normally (fails open) |
-| Token rotated but Food Guard still has the old one | 401 → Food Guard does nothing; Settings' setup steps remind you to paste the new token into **both** shortcuts |
+| Token rotated but Food Guard still has the old one | 401 → notification "Food Guard couldn't check: Token not recognised…"; the app stays open. Settings' setup steps remind you to paste the new token into **both** shortcuts |
+| New token lost before it was pasted (page closed, copy failed) | Rotate again; the token is never stored anywhere readable, so a fresh one is the recovery |
 | Meal at 12:30 AM | Belongs to the previous app day (before 4 AM); inside the 00:00–01:00 window, so no ⚠️ |
 | Lunch logged at 9 PM | Time field set to 12:15 → stored at 12:15, inside the window; logging late never flags a meal by itself |
 | Eating windows changed | Past days re-score against the new windows (same trade-off as goals) |
@@ -364,6 +379,12 @@ What blocks:
 - The **service-role key** exists only as an Edge Function secret and in local `.env` files that are git-ignored — never committed.
 - Sign-ups disabled after the owner account exists.
 - Sync token stored only as a SHA-256 hash; compared server-side.
+- The Edge Functions use the service key, so **their** checks are the security boundary:
+  - ownership comes only from the verified token; any `user_id` in the payload is ignored
+  - every field is validated, and a failed write never returns success
+  - errors are logged without payloads or tokens
+- No API response is cached on the device (§10).
+- Live tests refuse to run unless the configured account's email contains "test", so they can never wipe Anvit's own data.
 
 ## 12. Testing
 
@@ -389,6 +410,14 @@ What blocks:
   - workout de-duplication
   - pending/message builder
   - Food Guard result: below / exactly at / above the goal, no entries, fasting hours (blocked even with 0 kcal), fasting off, both reasons at once (target message wins)
+- **Invariant tests** over 200 seeded random histories:
+  - scores are whole numbers 0–100 and never `NaN`
+  - streaks are bounded, and frozen days are never good days
+  - archived habits never count after their archive day
+  - challenge progress stays inside its window (done can pass the target, e.g. 16/15, but never the window)
+  - reports are the same for the same input
+  - future records never change past scores
+
 Six layers (chose Q13). The first two run in CI on every push. Layers 3–5 run on demand: locally with `npm run test:live`, or from a manual GitHub workflow. They use a dedicated **test user** whose data is wiped at the start of each run.
 
 1. **Unit tests:** everything listed above and below, written test-first.
@@ -407,19 +436,33 @@ Six layers (chose Q13). The first two run in CI on every push. Layers 3–5 run 
    - the 4 AM rollover (3:59 AM vs 4:00 AM)
    - the report card on a countdown's date
    - offline banner (`context.setOffline`)
+   - a failed data load → "Couldn't load your data" → Retry recovers
+   - sign-out discards the session's data (going Back doesn't show it)
    - Settings validation for windows
 4. **Live function tests** (Node script, test user's token):
-   - `sync`: 401 (no/wrong token), 400 (bad bodies), 200 with steps + workouts, idempotent re-send, Shortcuts quirks (strings, single object, nulls), pending/nudge message
+   - `sync`:
+     - 401 for no or wrong token
+     - 400 for bad bodies
+     - 200 with steps + workouts
+     - idempotent re-send
+     - a corrected step total replaces the old one
+     - a partly invalid batch saves nothing
+     - an empty body is accepted
+     - Shortcuts quirks (strings, single object, nulls)
+     - a `user_id` in the payload is ignored
+     - pending/nudge message
+   - token rotation: the old token gets 401 at once, the new one works
    - `food-guard`: under target inside a window, at target, outside the windows with 0 kcal, fasting off. Windows are set relative to the real current time, because the server's clock can't be pinned.
-5. **Security test** (Node script):
+5. **Security test** (Node script), **every table**, using otherwise-valid rows (real foreign keys), so a rejection can only be RLS (error `42501`):
    - signed in as the test user, every table returns only the test user's rows
    - inserting a row for any other `user_id` is rejected
+   - updating one of your own rows to another `user_id` is rejected
    - signed out (anon key only), every table returns nothing and `ensure_setup` / `rotate_sync_token` are refused
 6. **iPhone test checklist** — `docs/test-plan.md`: numbered manual cases with steps and expected results, for what only the phone can show:
-   - home-screen install, icon, standalone launch; offline launch
+   - home-screen install, icon, standalone launch; offline launch shows "connect to load" and Retry works
    - Countdown Sync by tap and by the 1:30 AM automation; the nudge text
    - steps/workout appearing in the app
-   - Food Guard outside the windows (e.g. 2 PM), inside a window under target (e.g. 11:30 AM), at target, App Store blocked, server unreachable (airplane mode → app opens)
+   - Food Guard outside the windows (e.g. 2 PM), inside a window under target (e.g. 11:30 AM), at target, App Store blocked, server unreachable (airplane mode → app opens), old token (→ "couldn't check" notification)
    - 4 AM rollover on the device
    - Perfect Day overlay on the phone
 
@@ -430,7 +473,7 @@ Before calling a task done, every screen is also checked by hand in a real brows
 1. Create a free Supabase account and a project ("countdown", region Mumbai). Share the project URL, and run `npx supabase login` once so the CLI can deploy.
 2. In the Supabase dashboard: switch sign-ups off, then create two users (email + password, auto-confirmed):
    - Anvit's own login
-   - a **test user** for layers 3–5 of §12, whose details go in the git-ignored `.env.local` (and, for the manual GitHub workflow, as repository secrets)
+   - a **test user** for layers 3–5 of §12, whose email **must contain "test"** (e.g. `you+countdown-test@gmail.com`). Its details go in the git-ignored `.env.local` (and, for the manual GitHub workflow, as repository secrets).
 3. On the iPhone: open the site in Safari → Share → Add to Home Screen; build the Shortcut and the 1:30 AM automation from the written steps; build the Food Guard shortcut and its App-opened automation (ticking each food app + the App Store).
 
 ## 14. Risks to verify early

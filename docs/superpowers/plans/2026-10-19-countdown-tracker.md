@@ -92,6 +92,38 @@ Pure logic (`domain/`, `data/history.ts`, `*.vm.ts`, `month-matrix.ts`, `wheel-g
 
 **Task order:** 0 (Anvit, phone) · 1 scaffold · 2 shared helpers · 3–5 domain · 6 Supabase (needs Anvit) · 7 functions · 8 core + shell · 9 data · 10 Today · 11 Habits · 12 Food · 13 Settings · 14 Report · 15 live test harness · 16 docs, iPhone checklist, final verification.
 
+## Milestones
+
+Each milestone ends in a checkpoint. **Don't start the next milestone until its checkpoint passes.**
+
+| Milestone | Tasks | Checkpoint |
+|---|---|---|
+| M1 Foundation | 1–2 | Placeholder live on Pages; a deep link (`/countdown-tracker/today`) serves the app; `ng test`, `test:functions` and `ng build` all pass on the pinned toolchain |
+| M2 Rules | 3–5 | All domain unit tests and the 200-case invariant suite pass |
+| M3 Backend | 6–7 | `setup-check` passes; both functions deployed and returning the 401 JSON for a bad token |
+| M4 App core + data | 8–9 | Sign in/out with the test user; data loads; sign-out clears it; a failed load shows Retry |
+| M5 Screens | 10–14 | Every screen's component tests pass and its browser check is done on real data |
+| M6 Proof | 15–16 | `test:live` passes (setup, security, live functions, 20 Playwright tests); CI green; the iPhone checklist is handed over |
+
+## Review changes (2026-10-19)
+
+An external review of this plan was checked point by point. Accepted and built in:
+- **No API caching:** the service worker caches the app shell only (Anvit chose to drop offline data for v1).
+- **Session lifecycle:** the store resets on sign-out or account change, has an explicit status, and ignores loads from a previous session.
+- **Error states:** a failed load shows Retry.
+- **No double submits:** a store-wide `saving` lock covers Settings and Food writes.
+- **Security test:** covers every table, for inserts and reassigning updates.
+- **Live-test guard:** refuses any account whose email doesn't contain "test".
+- **Sync tests:** corrected totals, partial batches, old-token rejection and ignored `user_id`.
+- **Shortcut errors:** checked after every request; Food Guard reports an "unknown" state.
+- **Invariant tests**, leap days, the deep-link check in M1, and a portable icon-script error.
+
+Not taken, with reasons recorded in the conversation:
+- splitting the plan into seven documents
+- "challenge progress must not exceed the target" (16/15 is a valid result)
+- a single week definition (planner blocks for weekly habits and Mon–Sun for freezes are deliberate, spec §8)
+- reordering the tasks
+
 ---
 
 ### Task 0: Phone check (Anvit, ~2 minutes, any time before Task 16)
@@ -272,6 +304,9 @@ $html = Join-Path $env:TEMP 'countdown-icon.html'
 "<html><body style='margin:0;background:#000'>$svg</body></html>" | Set-Content $html -Encoding utf8
 $big = Join-Path $env:TEMP 'countdown-icon-512.png'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+if (-not (Test-Path $edge)) {
+  throw "Microsoft Edge not found at $edge. Install Edge or render scripts/icon.svg to PNGs with any SVG tool; the PNGs in public/icons are committed, so CI never needs this script."
+}
 Start-Process -FilePath $edge -Wait -ArgumentList '--headless=new', '--disable-gpu', '--hide-scrollbars', '--window-size=512,512', "--screenshot=$big", $html
 $src = [System.Drawing.Image]::FromFile($big)
 foreach ($size in 72, 96, 128, 144, 152, 180, 192, 384, 512) {
@@ -393,6 +428,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Private data must never be cached on devices (spec §10/§11): fail the deploy if API caching appears.
+      - run: node -e "if (require('./ngsw-config.json').dataGroups) { console.error('ngsw-config.json must not define dataGroups'); process.exit(1); }"
       - run: npx ng test --watch=false
       - run: npm run test:functions
       - run: npx ng build --base-href /countdown-tracker/
@@ -424,9 +461,10 @@ git -c credential.helper= -c "credential.helper=!f() { echo username=BrutalOverk
 GH_TOKEN="$T" gh run watch -R BrutalOverkill/countdown-tracker --exit-status $(GH_TOKEN="$T" gh run list -R BrutalOverkill/countdown-tracker -L 1 --json databaseId --jq '.[0].databaseId')
 curl -s -o /dev/null -w "%{http_code}\n" https://brutaloverkill.github.io/countdown-tracker/
 curl -s https://brutaloverkill.github.io/countdown-tracker/manifest.webmanifest | grep '"name"'
+curl -s https://brutaloverkill.github.io/countdown-tracker/today | grep -c '<app-root>'
 ```
 
-Expected: run succeeds; `200`; `"name": "Countdown",`.
+Expected: run succeeds; `200`; `"name": "Countdown",`; `1` (the deep link is served the app through `404.html`).
 
 ---
 
@@ -481,6 +519,8 @@ describe('calendar and app days', () => {
   it('validates yyyy-MM-dd strings', () => {
     expect(isValidDay('2026-10-19')).toBe(true);
     expect(isValidDay('2026-02-30')).toBe(false);
+    expect(isValidDay('2027-02-29')).toBe(false);
+    expect(isValidDay('2028-02-29')).toBe(true);
     expect(isValidDay('2026-1-9')).toBe(false);
     expect(isValidDay(20261019)).toBe(false);
   });
@@ -491,6 +531,9 @@ describe('calendar and app days', () => {
     expect(daysBetween('2026-10-19', '2026-11-08')).toBe(20);
     expect(daysBetween('2026-10-19', '2026-12-10')).toBe(52);
     expect(daysBetween('2026-11-08', '2026-10-19')).toBe(-20);
+    expect(addDays('2028-02-28', 1)).toBe('2028-02-29');
+    expect(monthEnd('2028-02-10')).toBe('2028-02-29');
+    expect(daysBetween('2028-02-28', '2028-03-01')).toBe(2);
   });
 
   it('lists days inclusively', () => {
@@ -1398,6 +1441,7 @@ git commit -m "Add overall streak with weekly freezes" -m "Co-Authored-By: Claud
 **Files:**
 - Create: `src/app/domain/challenges.ts`, `src/app/domain/challenges.spec.ts`
 - Create: `src/app/domain/report.ts`, `src/app/domain/report.spec.ts`
+- Create: `src/app/domain/invariants.spec.ts`
 
 **Interfaces:**
 - Consumes: `habitDone`, `dayScore`, `isPerfect`, `onCalorieTarget`, `trainedOn` (Task 3); `classifyDays`, `longestStreak` (Task 4); `bySortOrder`, `isActiveOn` (Task 3).
@@ -1677,11 +1721,122 @@ export function buildReport(countdown: Countdown, habits: readonly Habit[], chal
 Run: `npx ng test --watch=false`
 Expected: PASS — `challenges.spec.ts` 8, `report.spec.ts` 4, plus earlier suites.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Invariant tests over random histories**
+
+These target whole classes of bugs (NaN, out-of-range scores, freezes counted as good days, archived habits leaking, nondeterminism) rather than single examples. They use a seeded generator, so any failure reproduces exactly.
+
+Create `src/app/domain/invariants.spec.ts`:
+
+```ts
+import { addDays, eachDay } from '@shared/days';
+import { challengeProgress } from './challenges';
+import { buildReport } from './report';
+import { dayScore, isGood } from './scoring';
+import { overallStreak } from './streaks';
+import { ctx, habit, history } from './testing';
+import type { Challenge, Countdown, Habit } from './types';
+
+// Seeded LCG so a failing case can be replayed from its seed.
+function rng(seed: number): () => number {
+  let s = seed;
+  return () => {
+    s = (s * 1664525 + 1013904223) % 2 ** 32;
+    return s / 2 ** 32;
+  };
+}
+
+function randomCase(seed: number) {
+  const r = rng(seed);
+  const today = addDays('2026-10-01', Math.floor(r() * 60));
+  const sources = ['manual', 'manual', 'steps', 'calories', 'workout', 'fasting'] as const;
+  const habits: Habit[] = Array.from({ length: 1 + Math.floor(r() * 7) }, (_, i) =>
+    habit(`h${i}`, {
+      source: sources[Math.floor(r() * sources.length)],
+      frequency: r() < 0.15 ? 'weekly' : 'daily',
+      sortOrder: i,
+      createdDay: addDays('2026-09-01', Math.floor(r() * 40)),
+      archivedDay: r() < 0.2 ? addDays('2026-09-20', Math.floor(r() * 50)) : null,
+    }),
+  );
+  const days = eachDay('2026-09-01', today);
+  const some = () => days.filter(() => r() < 0.6);
+  const h = history({
+    checks: Object.fromEntries(habits.map((x) => [x.id, some()])),
+    steps: Object.fromEntries(some().map((d) => [d, Math.floor(r() * 20_000)])),
+    workouts: some(),
+    food: Object.fromEntries(some().map((d) => [d, { kcal: Math.floor(r() * 4000), minutes: [Math.floor(r() * 1440)] }])),
+  });
+  return { today, habits, days, c: ctx(today, h) };
+}
+
+const cases = Array.from({ length: 200 }, (_, i) => randomCase(i + 1));
+
+describe('domain invariants (200 seeded random histories)', () => {
+  it('scores are whole numbers from 0 to 100 and never NaN', () => {
+    for (const { habits, days, c } of cases) {
+      for (const d of days) {
+        const s = dayScore(habits, d, c);
+        expect(Number.isInteger(s.score)).toBe(true);
+        expect(s.score).toBeGreaterThanOrEqual(0);
+        expect(s.score).toBeLessThanOrEqual(100);
+        expect(s.done).toBeLessThanOrEqual(s.total);
+      }
+    }
+  });
+
+  it('streaks are bounded and frozen days are never good days', () => {
+    for (const { habits, days, c } of cases) {
+      const s = overallStreak(habits, c);
+      expect(s.length).toBeGreaterThanOrEqual(0);
+      expect(s.length).toBeLessThanOrEqual(days.length);
+      for (const d of s.frozen) expect(isGood(dayScore(habits, d, c))).toBe(false);
+    }
+  });
+
+  it('archived habits never count on or after their archive day', () => {
+    for (const { habits, days, c } of cases) {
+      for (const h of habits.filter((x) => x.archivedDay !== null)) {
+        const without = habits.filter((x) => x !== h);
+        for (const d of days.filter((x) => x >= h.archivedDay!)) expect(dayScore(habits, d, c)).toEqual(dayScore(without, d, c));
+      }
+    }
+  });
+
+  it('challenge progress stays inside its window (done may pass the target, never the window)', () => {
+    for (const { habits, today, c } of cases) {
+      const cd: Countdown = { id: 'cd', title: 'T', emoji: '🎯', targetDate: addDays(today, 5), createdDay: addDays(today, -20) };
+      const ch: Challenge = { id: 'ch', countdownId: 'cd', habitId: habits[0].id, targetDays: 10, startDay: addDays(today, -20) };
+      const p = challengeProgress(ch, habits[0], cd, c);
+      expect(p.done).toBeLessThanOrEqual(p.window);
+      expect(p.elapsed + p.left).toBeLessThanOrEqual(p.window);
+      expect(p.pace).toBeGreaterThanOrEqual(0);
+      expect(p.pace).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('a report is identical for identical inputs', () => {
+    for (const { habits, today, c } of cases.slice(0, 50)) {
+      const cd: Countdown = { id: 'cd', title: 'T', emoji: '🎯', targetDate: today, createdDay: '2026-09-10' };
+      expect(buildReport(cd, habits, [], c)).toEqual(buildReport(cd, habits, [], c));
+    }
+  });
+
+  it('records dated in the future never change past scores', () => {
+    for (const { habits, today, days, c } of cases.slice(0, 50)) {
+      const future = { ...c, history: { ...c.history, steps: new Map([...c.history.steps, [addDays(today, 3), 50_000]]) } };
+      for (const d of days) expect(dayScore(habits, d, future)).toEqual(dayScore(habits, d, c));
+    }
+  });
+});
+```
+
+Run: `npx ng test --watch=false` → Expected: `invariants.spec.ts` PASS (6). If one fails, the message names the seed's case; fix the rule, not the test.
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/app/domain/challenges.ts src/app/domain/challenges.spec.ts src/app/domain/report.ts src/app/domain/report.spec.ts
-git commit -m "Add countdown challenges and report card" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git add src/app/domain/challenges.ts src/app/domain/challenges.spec.ts src/app/domain/report.ts src/app/domain/report.spec.ts src/app/domain/invariants.spec.ts
+git commit -m "Add countdown challenges, report card and domain invariant tests" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -1692,7 +1847,6 @@ Steps marked **(Anvit)** need Anvit at the keyboard; Claude prepares everything 
 **Files:**
 - Create: `supabase/config.toml` (via `supabase init`), `supabase/migrations/20261019000000_init.sql`
 - Create: `src/app/core/config.ts`, `scripts/live/env.mjs`, `scripts/live/setup-check.mjs`, `.env.local` (git-ignored; Anvit fills the password)
-- Modify: `ngsw-config.json`
 
 **Interfaces:**
 - Produces (DB): tables/columns per spec §6; RPCs `ensure_setup()` (seeds settings, 9 habits, 2 countdowns on first call; no-op after) and `rotate_sync_token() → text`.
@@ -1704,7 +1858,7 @@ Steps marked **(Anvit)** need Anvit at the keyboard; Claude prepares everything 
 1. Go to https://supabase.com → **Sign in with GitHub** (use the personal account BrutalOverkill) → **New project**: name `countdown`, region **South Asia (Mumbai)**, generate a database password and save it in your password manager.
 2. **Project Settings → API Keys**: copy the **Project URL** (`https://<ref>.supabase.co`) and the **Publishable key** (`sb_publishable_…`). If the page only shows legacy keys, copy the `anon` `public` key instead. Paste both into the chat — both are public by design.
 3. **Authentication → Sign In / Providers → Email**: keep Email enabled; turn **"Allow new users to sign up" OFF**; Save.
-4. **Authentication → Users → Add user → Create new user**: your own email + a strong password, tick **Auto Confirm User**. Repeat for the **test user**, e.g. `you+countdown-test@gmail.com`, with a different password.
+4. **Authentication → Users → Add user → Create new user**: your own email + a strong password, tick **Auto Confirm User**. Repeat for the **test user**, whose email **must contain "test"** (e.g. `you+countdown-test@gmail.com`; the live tests refuse any other account), with a different password.
 5. Tell Claude the test user's email (not the password).
 
 - [ ] **Step 2: Initialise the Supabase folder**
@@ -1908,7 +2062,7 @@ Ask Anvit to run, one at a time (each may open a browser or ask for the database
 
 Expected: `Applying migration 20261019000000_init.sql...` then `Finished supabase db push.`
 
-- [ ] **Step 5: App config and the offline data cache**
+- [ ] **Step 5: App config**
 
 Create `src/app/core/config.ts` (values from Step 1.2 — the URL and publishable key are public; RLS protects the data):
 
@@ -1921,17 +2075,7 @@ export const SHORTCUT_DOCS_URL = 'https://github.com/BrutalOverkill/countdown-tr
 
 Replace `<ref>` and `<publishable key>` with the real values before saving.
 
-In `ngsw-config.json`, add a top-level `"dataGroups"` array after `"assetGroups"` (same `<ref>`):
-
-```json
-  "dataGroups": [
-    {
-      "name": "supabase-reads",
-      "urls": ["https://<ref>.supabase.co/rest/v1/**"],
-      "cacheConfig": { "strategy": "freshness", "maxSize": 300, "maxAge": "7d", "timeout": "4s" }
-    }
-  ]
-```
+Leave `ngsw-config.json` as generated (asset groups only). **Do not add `dataGroups`**: API responses hold private data and must never be cached on the device (spec §10/§11). Confirm with `grep -c dataGroups ngsw-config.json` → `0`.
 
 - [ ] **Step 6: Local secrets file for live tests**
 
@@ -1973,6 +2117,11 @@ function required(name) {
   return value;
 }
 
+// Every live check wipes the signed-in account's data, so it must only ever run as the dedicated test user.
+if (!/test/i.test(env.email)) {
+  throw new Error('Refusing to run: E2E_EMAIL must be the dedicated test account (its address must contain "test").');
+}
+
 export const TABLES = ['habit_checks', 'challenges', 'tasks', 'food_entries', 'saved_foods', 'workouts', 'steps_daily', 'habits', 'countdowns', 'settings'];
 
 export function anon() {
@@ -1982,7 +2131,8 @@ export function anon() {
 export async function signIn() {
   const db = anon();
   const { data, error } = await db.auth.signInWithPassword({ email: env.email, password: env.password });
-  if (error) throw error;
+  if (error) throw new Error(`Test user sign-in failed: ${error.message}`);
+  if (data.user.email?.toLowerCase() !== env.email.toLowerCase()) throw new Error('Signed-in account is not the configured test user; refusing to continue.');
   return { db, userId: data.user.id };
 }
 
@@ -2041,7 +2191,7 @@ Expected: `setup-check passed`. (A missing password prints `Missing E2E_PASSWORD
 - [ ] **Step 9: Commit**
 
 ```bash
-git add supabase/config.toml supabase/migrations src/app/core/config.ts ngsw-config.json scripts/live
+git add supabase/config.toml supabase/migrations src/app/core/config.ts scripts/live
 git commit -m "Add Supabase schema with owner-only RLS, setup RPCs and live-test helpers" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -2131,6 +2281,11 @@ describe('validatePayload', () => {
     expect(r.ok && r.value.workouts[0]).toEqual({ start: '2026-10-19T10:00:00.000Z', durationMin: 45, name: 'x'.repeat(80) });
     const blank = validatePayload({ workouts: [{ start: '2026-10-19T10:00:00Z', durationMin: '', name: '' }] }, LATEST);
     expect(blank.ok && blank.value.workouts[0]).toEqual({ start: '2026-10-19T10:00:00.000Z', durationMin: null, name: null });
+  });
+
+  it('drops fields it does not know, including any user_id (ownership comes from the token)', () => {
+    const r = validatePayload({ user_id: 'someone-else', steps: [{ date: '2026-10-19', count: 5, user_id: 'someone-else' }] }, LATEST);
+    expect(r).toEqual({ ok: true, value: { steps: [{ date: '2026-10-19', count: 5 }], workouts: [] } });
   });
 });
 
@@ -2334,7 +2489,7 @@ export function guardResult(i: GuardInput): GuardResult {
 - [ ] **Step 5: Run the logic tests to see them pass**
 
 Run: `npm run test:functions`
-Expected: PASS — 5 files (days, windows, token, sync logic, food-guard logic), 36 tests.
+Expected: PASS — 5 files (days, windows, token, sync logic, food-guard logic), 37 tests.
 
 - [ ] **Step 6: HTTP plumbing shared by both functions**
 
@@ -2525,7 +2680,7 @@ git commit -m "Add sync and food-guard Edge Functions" -m "Co-Authored-By: Claud
 
 **Interfaces:**
 - Consumes: `config.ts` (Task 6); `@shared/days` (`appDayOf`, `istMinutesOf`, `weekdayOf`); `@shared/windows` (`formatClock`).
-- Produces: `SUPABASE: InjectionToken<SupabaseClient>`; `AuthService { session: Signal<Session|null>; email: Signal<string>; ready: Promise<void>; signIn(email, password): Promise<string|null>; signOut(): Promise<void> }`; `authGuard: CanActivateFn`; `Clock { today: Signal<Day>; minute: Signal<number>; instant: Signal<Date> }`; `Online { online: Signal<boolean> }`; `ToastService { message: Signal<string|null>; show(text): void }` plus constants `SAVE_FAILED`, `OFFLINE`; format helpers `formatNumber(n)`, `weekdayShort(day)` (`'Sun'`), `formatCompact(n)`, `formatDuration(min)`, `dayLabel(day)` (`'Mon 19 Oct'`), `dayLabelWithYear(day)`, `monthLabel(day)` (`'Oct 2026'`), `dayRange(from, to)` (`'19 Oct – 7 Nov'`), `timeOf(iso)` (`'6:00 PM'`), `hhmmOf(date)` (`'18:00'`); components `Shell`, `TabBar`, `Toast`, `LoginPage`; routes `/login`, `/today`, `/habits`, `/food`, `/settings`, `/report/:id`.
+- Produces: `SUPABASE: InjectionToken<SupabaseClient>`; `AuthService { session: Signal<Session|null>; email: Signal<string>; userId: Signal<string|null>; ready: Promise<void>; signIn(email, password): Promise<string|null>; signOut(): Promise<void> }`; `authGuard: CanActivateFn`; `Clock { today: Signal<Day>; minute: Signal<number>; instant: Signal<Date> }`; `Online { online: Signal<boolean> }`; `ToastService { message: Signal<string|null>; show(text): void }` plus constants `SAVE_FAILED`, `OFFLINE`; format helpers `formatNumber(n)`, `weekdayShort(day)` (`'Sun'`), `formatCompact(n)`, `formatDuration(min)`, `dayLabel(day)` (`'Mon 19 Oct'`), `dayLabelWithYear(day)`, `monthLabel(day)` (`'Oct 2026'`), `dayRange(from, to)` (`'19 Oct – 7 Nov'`), `timeOf(iso)` (`'6:00 PM'`), `hhmmOf(date)` (`'18:00'`); components `Shell`, `TabBar`, `Toast`, `LoginPage`; routes `/login`, `/today`, `/habits`, `/food`, `/settings`, `/report/:id`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2705,6 +2860,7 @@ export class AuthService {
   private readonly db = inject(SUPABASE);
   readonly session = signal<Session | null>(null);
   readonly email = computed(() => this.session()?.user.email ?? '');
+  readonly userId = computed(() => this.session()?.user.id ?? null);
   readonly ready: Promise<void>;
 
   constructor() {
@@ -3111,7 +3267,7 @@ git commit -m "Add auth, clock, formatting, login, shell and routes" -m "Co-Auth
 - Produces (`history.ts`): `HistoryRows { checks: CheckRow[]; steps: StepsRow[]; workouts: WorkoutRow[]; food: FoodTotalsRow[] }` where `FoodTotalsRow = Pick<FoodEntryRow, 'day' | 'kcal' | 'protein_g' | 'eaten_at'>`; `foodDayOf(entries): FoodDay`; `buildHistory(rows): History`; `mergeHistory(older, newer): History`; `withCheck(h, habitId, day, on): History`; `withWorkouts(h, day, list): History`; `withFoodDay(h, day, food: FoodDay | null): History`.
 - Produces (`select-all.ts`): `selectAll<T>(page: (from, to) => PromiseLike<{ data: T[] | null; error: PostgrestError | null }>): Promise<T[]>`.
 - Produces (`TrackerApi`, all async, throw on error): `ensureSetup()`, `loadConfig(): { goals, lastSyncAt, hasToken, habits, countdowns, challenges }`, `loadHistory(from, to): HistoryRows`, `setCheck(habitId, day, on)`, `addManualWorkout(day, startedAt): WorkoutRow`, `deleteWorkout(id)`, `loadFoodDay(day): FoodEntryRow[]`, `addFood(input: NewFood): FoodEntryRow`, `updateFood(id, input: NewFood)`, `deleteFood(id)`, `loadSavedFoods(): SavedFoodRow[]`, `saveFood(name, kcal, proteinG): SavedFoodRow`, `deleteSavedFood(id)`, `bumpSavedFood(id, useCount)`, `addCountdown(title, emoji, targetDate)`, `updateCountdown(id, title, emoji, targetDate)`, `deleteCountdown(id)`, `addChallenge(countdownId, habitId, targetDays, startDay)`, `deleteChallenge(id)`, `addHabit(input: NewHabit)`, `updateHabit(id, input: NewHabit)`, `archiveHabit(id)`, `setSortOrders(ids: string[])`, `updateGoals(stepGoal, kcalGoal)`, `updateFasting(enabled, windows)`, `rotateToken(): string`, `loadTasks(month): TaskRow[]`, `addTask(title, month): TaskRow`, `setTaskDone(id, done)`, `deleteTask(id)`. `NewFood = { day, eatenAt, name, kcal, proteinG: number|null, savedFoodId: string|null }`; `NewHabit = { name, emoji, color, frequency, source, slot, weekday, sortOrder }`.
-- Produces (`TrackerStore`, root): signals `loaded`, `habits`, `countdowns`, `challenges`, `goals`, `lastSyncAt`, `hasToken`, `history`, `today` (= `Clock.today`), `ctx` (computed `Ctx`); methods `load()`, `reload()`, `refreshIfStale()`, `reloadConfig()`, `ensureHistoryFrom(day)`, `toggleCheck(habitId, day)`, `addManualWorkout()`, `removeWorkout(w)`, `setFoodDay(day, entries: FoodEntryRow[])`, `guard(job): Promise<boolean>` (runs a write with offline check + toast on failure, then `reloadConfig()`), `rotateToken(): Promise<string | null>`.
+- Produces (`TrackerStore`, root): `type LoadStatus = 'idle' | 'loading' | 'ready' | 'error'`; signals `status`, `loaded` (= `status() === 'ready'`), `saving`, `habits`, `countdowns`, `challenges`, `goals`, `lastSyncAt`, `hasToken`, `history`, `today` (= `Clock.today`), `ctx` (computed `Ctx`); methods `load(userId)` (resets first if the account changed; sets `error` on failure), `reset()` (sign-out / expiry / account switch: clears everything and invalidates in-flight loads and rollbacks), `reload()`, `refreshIfStale()`, `reloadConfig()`, `ensureHistoryFrom(day)`, `toggleCheck(habitId, day)`, `addManualWorkout()`, `removeWorkout(w)`, `setFoodDay(day, entries: FoodEntryRow[])`, `guard(job): Promise<boolean>` (runs a write: ignored while another is `saving`, refused offline, toast on failure, then `reloadConfig()`), `rotateToken(): Promise<string | null>`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -3190,10 +3346,61 @@ describe('TrackerStore', () => {
       loadConfig: vi.fn().mockResolvedValue(config),
       loadHistory: vi.fn().mockResolvedValue({ ...emptyRows, steps: [{ day: '2026-10-19', count: 5 }] }),
     });
-    await store.load();
+    await store.load('user-a');
+    expect(store.status()).toBe('ready');
     expect(store.loaded()).toBe(true);
     expect(store.habits().map((h) => h.id)).toEqual(['h1']);
     expect(store.history().steps.get('2026-10-19')).toBe(5);
+  });
+
+  it('marks a failed load as an error instead of loading forever', async () => {
+    const { store } = setup({ ensureSetup: vi.fn().mockResolvedValue(undefined), loadConfig: vi.fn().mockRejectedValue(new Error('500')) });
+    await store.load('user-a');
+    expect(store.status()).toBe('error');
+    expect(store.loaded()).toBe(false);
+  });
+
+  it('reset discards data and ignores a load that finishes afterwards', async () => {
+    let finish!: (value: unknown) => void;
+    const api = {
+      ensureSetup: vi.fn().mockResolvedValue(undefined),
+      loadConfig: vi.fn(() => new Promise((r) => (finish = r))),
+      loadHistory: vi.fn().mockResolvedValue(emptyRows),
+    };
+    const { store } = setup(api as unknown as Partial<TrackerApi>);
+    const pending = store.load('user-a');
+    await vi.waitFor(() => expect(api.loadConfig).toHaveBeenCalled());
+    store.reset();
+    finish(config);
+    await pending;
+    expect(store.habits()).toEqual([]);
+    expect(store.status()).toBe('idle');
+  });
+
+  it('clears the previous account before loading a different one', async () => {
+    const { store } = setup({
+      ensureSetup: vi.fn().mockResolvedValue(undefined),
+      loadConfig: vi.fn().mockResolvedValueOnce(config).mockReturnValueOnce(new Promise(() => undefined)),
+      loadHistory: vi.fn().mockResolvedValue(emptyRows),
+    });
+    await store.load('user-a');
+    expect(store.habits()).toHaveLength(1);
+    void store.load('user-b');
+    expect(store.habits()).toEqual([]);
+    expect(store.loaded()).toBe(false);
+  });
+
+  it('ignores a second save while one is in flight', async () => {
+    let release!: () => void;
+    const job = vi.fn(() => new Promise<void>((r) => (release = r)));
+    const { store } = setup({ loadConfig: vi.fn().mockResolvedValue(config) });
+    const first = store.guard(job);
+    expect(store.saving()).toBe(true);
+    expect(await store.guard(job)).toBe(false);
+    release();
+    expect(await first).toBe(true);
+    expect(job).toHaveBeenCalledTimes(1);
+    expect(store.saving()).toBe(false);
   });
 
   it('serialises rapid toggles so the server ends in the screen state', async () => {
@@ -3584,6 +3791,8 @@ import { buildHistory, foodDayOf, mergeHistory, withCheck, withFoodDay, withWork
 import { toWorkout, type FoodEntryRow } from './rows';
 import { TrackerApi } from './tracker-api';
 
+export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
+
 @Injectable({ providedIn: 'root' })
 export class TrackerStore {
   private readonly api = inject(TrackerApi);
@@ -3591,7 +3800,9 @@ export class TrackerStore {
   private readonly online = inject(Online);
   private readonly toast = inject(ToastService);
 
-  readonly loaded = signal(false);
+  readonly status = signal<LoadStatus>('idle');
+  readonly loaded = computed(() => this.status() === 'ready');
+  readonly saving = signal(false);
   readonly habits = signal<Habit[]>([]);
   readonly countdowns = signal<Countdown[]>([]);
   readonly challenges = signal<Challenge[]>([]);
@@ -3602,31 +3813,65 @@ export class TrackerStore {
   readonly today = this.clock.today;
   readonly ctx = computed<Ctx>(() => ({ history: this.history(), goals: this.goals(), today: this.today() }));
 
+  private owner: string | null = null;
+  // Bumped by reset(); async work started under an older generation must not touch state.
+  private generation = 0;
   private loadedFrom: Day | null = null;
   private lastLoad = 0;
   private readonly queues = new Map<string, Promise<unknown>>();
 
-  async load(): Promise<void> {
+  /** Loads data for `userId`, first discarding anything held for a different account. */
+  async load(userId: string): Promise<void> {
+    if (this.owner !== userId) this.reset();
+    this.owner = userId;
+    const gen = this.generation;
+    this.status.set('loading');
     try {
       await this.api.ensureSetup();
     } catch {
-      // Offline: setup already ran on an earlier visit and the cached reads below still work.
+      // Setup already ran on an earlier visit, or we're offline; the reads below decide which.
     }
-    await this.reload();
+    try {
+      await this.reload(gen);
+    } catch {
+      if (gen === this.generation) this.status.set('error');
+    }
   }
 
-  async reload(): Promise<void> {
-    await this.reloadConfig();
+  /** Sign-out, session expiry or an account switch: forget everything about the current account. */
+  reset(): void {
+    this.generation++;
+    this.owner = null;
+    this.status.set('idle');
+    this.saving.set(false);
+    this.habits.set([]);
+    this.countdowns.set([]);
+    this.challenges.set([]);
+    this.goals.set(DEFAULT_GOALS);
+    this.lastSyncAt.set(null);
+    this.hasToken.set(false);
+    this.history.set(EMPTY_HISTORY);
+    this.loadedFrom = null;
+    this.lastLoad = 0;
+    this.queues.clear();
+  }
+
+  async reload(gen = this.generation): Promise<void> {
+    await this.reloadConfig(gen);
+    if (gen !== this.generation) return;
     const today = this.today();
     const from = [addDays(today, -180), ...this.countdowns().map((c) => c.createdDay)].sort()[0];
-    this.history.set(buildHistory(await this.api.loadHistory(from, today)));
+    const rows = await this.api.loadHistory(from, today);
+    if (gen !== this.generation) return;
+    this.history.set(buildHistory(rows));
     this.loadedFrom = from;
     this.lastLoad = Date.now();
-    this.loaded.set(true);
+    this.status.set('ready');
   }
 
-  async reloadConfig(): Promise<void> {
+  async reloadConfig(gen = this.generation): Promise<void> {
     const cfg = await this.api.loadConfig();
+    if (gen !== this.generation) return;
     this.goals.set(cfg.goals);
     this.lastSyncAt.set(cfg.lastSyncAt);
     this.hasToken.set(cfg.hasToken);
@@ -3642,19 +3887,23 @@ export class TrackerStore {
 
   async ensureHistoryFrom(from: Day): Promise<void> {
     if (this.loadedFrom !== null && from >= this.loadedFrom) return;
+    const gen = this.generation;
     const to = this.loadedFrom ? addDays(this.loadedFrom, -1) : this.today();
-    const older = buildHistory(await this.api.loadHistory(from, to));
-    this.history.update((h) => mergeHistory(older, h));
+    const rows = await this.api.loadHistory(from, to);
+    if (gen !== this.generation) return;
+    this.history.update((h) => mergeHistory(buildHistory(rows), h));
     this.loadedFrom = from;
   }
 
   async toggleCheck(habitId: string, day: Day): Promise<void> {
     if (!this.online.online()) return this.toast.show(OFFLINE);
+    const gen = this.generation;
     const on = !(this.history().checks.get(habitId)?.has(day) ?? false);
     this.history.update((h) => withCheck(h, habitId, day, on));
     try {
       await this.enqueue(`${habitId}|${day}`, () => this.api.setCheck(habitId, day, on));
     } catch {
+      if (gen !== this.generation) return;
       this.history.update((h) => withCheck(h, habitId, day, !on));
       this.toast.show(SAVE_FAILED);
     }
@@ -3662,10 +3911,11 @@ export class TrackerStore {
 
   async addManualWorkout(): Promise<void> {
     if (!this.online.online()) return this.toast.show(OFFLINE);
+    const gen = this.generation;
     const day = this.today();
     try {
       const row = await this.api.addManualWorkout(day, this.clock.instant().toISOString());
-      this.history.update((h) => withWorkouts(h, day, [...(h.workouts.get(day) ?? []), toWorkout(row)]));
+      if (gen === this.generation) this.history.update((h) => withWorkouts(h, day, [...(h.workouts.get(day) ?? []), toWorkout(row)]));
     } catch {
       this.toast.show(SAVE_FAILED);
     }
@@ -3673,9 +3923,10 @@ export class TrackerStore {
 
   async removeWorkout(w: Workout): Promise<void> {
     if (!this.online.online()) return this.toast.show(OFFLINE);
+    const gen = this.generation;
     try {
       await this.api.deleteWorkout(w.id);
-      this.history.update((h) => withWorkouts(h, w.day, (h.workouts.get(w.day) ?? []).filter((x) => x.id !== w.id)));
+      if (gen === this.generation) this.history.update((h) => withWorkouts(h, w.day, (h.workouts.get(w.day) ?? []).filter((x) => x.id !== w.id)));
     } catch {
       this.toast.show(SAVE_FAILED);
     }
@@ -3685,12 +3936,14 @@ export class TrackerStore {
     this.history.update((h) => withFoodDay(h, day, entries.length ? foodDayOf(entries) : null));
   }
 
-  /** Runs a settings-style write: refuses offline, toasts on failure, reloads config on success. */
+  /** Runs one settings-style write at a time: ignored while another is saving, refused offline, toasts on failure. */
   async guard(job: () => Promise<unknown>): Promise<boolean> {
+    if (this.saving()) return false;
     if (!this.online.online()) {
       this.toast.show(OFFLINE);
       return false;
     }
+    this.saving.set(true);
     try {
       await job();
       await this.reloadConfig();
@@ -3698,6 +3951,8 @@ export class TrackerStore {
     } catch {
       this.toast.show(SAVE_FAILED);
       return false;
+    } finally {
+      this.saving.set(false);
     }
   }
 
@@ -3716,25 +3971,63 @@ export class TrackerStore {
 }
 ```
 
-- [ ] **Step 8: Load the store from the shell**
+- [ ] **Step 8: Drive the store from the shell (load, reset, Retry)**
 
-In `src/app/features/shell/shell.ts`: import `TrackerStore` from `'../../data/tracker.store'`; add the field `protected readonly store = inject(TrackerStore);`; wrap the outlet so pages only render once data is in; and refresh when the app comes back to the foreground. The template's `<router-outlet />` line becomes:
-
-```html
-        @if (store.loaded()) {
-          <router-outlet />
-        } @else {
-          <p class="muted p-6 text-center">Loading…</p>
-        }
-```
-
-and the constructor becomes:
+Replace `src/app/features/shell/shell.ts`:
 
 ```ts
+import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject } from '@angular/core';
+import { Router, RouterOutlet } from '@angular/router';
+import { AuthService } from '../../core/auth.service';
+import { Online } from '../../core/online';
+import { TrackerStore } from '../../data/tracker.store';
+import { TabBar } from './tab-bar';
+import { Toast } from './toast';
+
+@Component({
+  selector: 'app-shell',
+  imports: [RouterOutlet, TabBar, Toast],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <div class="mx-auto flex min-h-dvh max-w-5xl pt-[env(safe-area-inset-top)] lg:gap-6 lg:px-6">
+      <app-tab-bar />
+      <main class="min-w-0 flex-1 px-3 pb-28 pt-3 lg:pb-6">
+        @if (!online.online() && store.loaded()) {
+          <p role="status" class="mb-3 rounded-xl bg-raised px-3 py-2 text-center text-sm font-semibold text-count">Offline — changes won't save</p>
+        }
+        @switch (store.status()) {
+          @case ('ready') {
+            <router-outlet />
+          }
+          @case ('error') {
+            <div class="card mt-6 text-center" role="alert">
+              <p class="font-bold">{{ online.online() ? "Couldn't load your data" : "You're offline — connect to load your data" }}</p>
+              <button type="button" class="btn mt-3" (click)="retry()">Retry</button>
+            </div>
+          }
+          @default {
+            <p class="muted p-6 text-center">Loading…</p>
+          }
+        }
+      </main>
+    </div>
+    <app-toast />
+  `,
+})
+export class Shell {
+  protected readonly store = inject(TrackerStore);
+  protected readonly online = inject(Online);
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+
   constructor() {
-    void this.store.load().catch(() => this.toast.show("Couldn't load your data — check your connection and reopen the app"));
+    this.retry();
     effect(() => {
-      if (this.auth.session() === null) void this.router.navigateByUrl('/login');
+      // Signed out or the session expired: drop the previous account's data before anything else renders.
+      if (this.auth.session() === null) {
+        this.store.reset();
+        void this.router.navigateByUrl('/login');
+      }
     });
     const onVisible = () => {
       if (!document.hidden) void this.store.refreshIfStale();
@@ -3742,18 +4035,29 @@ and the constructor becomes:
     document.addEventListener('visibilitychange', onVisible);
     inject(DestroyRef).onDestroy(() => document.removeEventListener('visibilitychange', onVisible));
   }
+
+  protected retry(): void {
+    const userId = this.auth.userId();
+    if (userId) void this.store.load(userId);
+  }
+}
 ```
 
-with the extra imports `DestroyRef` (from `@angular/core`) and `ToastService` (`'../../core/toast.service'`) and the field `private readonly toast = inject(ToastService);`.
+(The offline cold-start case lands in `error` because the reads fail; the message then reads "You're offline — connect to load your data". Nothing is cached on the device.)
 
 - [ ] **Step 9: Run the tests to see them pass**
 
 Run: `npx ng test --watch=false`
-Expected: PASS — `history.spec.ts` (4), `tracker.store.spec.ts` (3), plus earlier suites.
+Expected: PASS — `history.spec.ts` (4), `tracker.store.spec.ts` (7), plus earlier suites.
 
 - [ ] **Step 10: Browser check**
 
-`npx ng serve`, sign in as the test user (phone-sized window). Expected: "Loading…" flashes, then the stub Today heading. In DevTools → Network, requests to `/rest/v1/settings`, `/habits`, `/countdowns`, `/challenges`, `/habit_checks`, `/steps_daily`, `/workouts`, `/food_entries` all return 200. Stop the server.
+`npx ng serve`, sign in as the test user (phone-sized window). Expected: "Loading…" flashes, then the stub Today heading. In DevTools → Network, requests to `/rest/v1/settings`, `/habits`, `/countdowns`, `/challenges`, `/habit_checks`, `/steps_daily`, `/workouts`, `/food_entries` all return 200. Then:
+- DevTools → Network → block `*/rest/v1/*`, reload → "Couldn't load your data" + Retry; unblock → Retry loads.
+- Network → Offline, reload → "You're offline — connect to load your data".
+- Application → Cache Storage holds no Supabase responses.
+
+Stop the server.
 
 - [ ] **Step 11: Commit**
 
@@ -5592,9 +5896,9 @@ import { defaultTime, foodLines, parseFood, suggest, totals, type FoodLine } fro
         <div class="mt-1 flex flex-wrap gap-1">
           @for (s of chips(); track s.id) {
             @if (editSaved()) {
-              <button type="button" class="rounded-xl bg-raised px-2 py-1 text-xs" [attr.aria-label]="'Delete saved ' + s.name" (click)="deleteSaved(s)">✕ {{ s.name }}</button>
+              <button type="button" class="rounded-xl bg-raised px-2 py-1 text-xs" [attr.aria-label]="'Delete saved ' + s.name" [disabled]="busy()" (click)="deleteSaved(s)">✕ {{ s.name }}</button>
             } @else {
-              <button type="button" class="rounded-xl bg-raised px-2 py-1 text-xs" [disabled]="!online()" (click)="addSaved(s)">{{ s.name }} <b class="text-kcal">{{ s.kcal }}</b></button>
+              <button type="button" class="rounded-xl bg-raised px-2 py-1 text-xs" [disabled]="!online() || busy()" (click)="addSaved(s)">{{ s.name }} <b class="text-kcal">{{ s.kcal }}</b></button>
             }
           } @empty {
             <p class="muted">Tick ☆ save when adding a food to reuse it.</p>
@@ -5613,8 +5917,8 @@ import { defaultTime, foodLines, parseFood, suggest, totals, type FoodLine } fro
                   <input #eKcal class="field !w-[4.5rem]" [value]="line.kcal" inputmode="numeric" aria-label="kcal" />
                   <input #eProtein class="field !w-[5.5rem]" [value]="line.protein ?? ''" inputmode="decimal" aria-label="Protein" />
                   <input #eTime class="field !w-[6.5rem]" type="time" [value]="line.hhmm" aria-label="Time" />
-                  <button type="button" class="btn" [disabled]="!online()" (click)="saveEdit(line, eName, eKcal, eProtein, eTime)">Save</button>
-                  <button type="button" class="btn-quiet !text-kcal" [disabled]="!online()" (click)="remove(line)">{{ confirmDelete() === line.id ? 'Tap again' : 'Delete' }}</button>
+                  <button type="button" class="btn" [disabled]="!online() || busy()" (click)="saveEdit(line, eName, eKcal, eProtein, eTime)">Save</button>
+                  <button type="button" class="btn-quiet !text-kcal" [disabled]="!online() || busy()" (click)="remove(line)">{{ confirmDelete() === line.id ? 'Tap again' : 'Delete' }}</button>
                   <button type="button" class="btn-quiet" (click)="editing.set(null)">Cancel</button>
                 </div>
               } @else {
@@ -5687,13 +5991,25 @@ export class FoodPage {
     this.day.set(addDays(this.day(), n));
   }
 
+  /** One food write at a time, so a double tap or an edit racing a delete can't interleave. */
+  private async run(job: () => Promise<void>): Promise<void> {
+    if (this.busy()) return;
+    this.busy.set(true);
+    try {
+      await job();
+    } catch {
+      this.toast.show(SAVE_FAILED);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   protected async add(event: Event, name: HTMLInputElement, kcal: HTMLInputElement, protein: HTMLInputElement, time: HTMLInputElement): Promise<void> {
     event.preventDefault();
     const parsed = parseFood({ name: name.value, kcal: kcal.value, protein: protein.value, time: time.value }, this.day());
     if (!parsed.ok) return this.error.set(parsed.error);
     this.error.set(null);
-    this.busy.set(true);
-    try {
+    await this.run(async () => {
       const match = this.saved().find((s) => s.name.toLowerCase() === parsed.value.name.toLowerCase()) ?? null;
       let savedFoodId = match?.id ?? null;
       if (match) await this.bump(match);
@@ -5709,22 +6025,16 @@ export class FoodPage {
       protein.value = '';
       this.query.set('');
       this.saveIt.set(false);
-    } catch {
-      this.toast.show(SAVE_FAILED);
-    } finally {
-      this.busy.set(false);
-    }
+    });
   }
 
   protected async addSaved(food: SavedFoodRow): Promise<void> {
-    try {
+    await this.run(async () => {
       const eatenAt = instantFor(this.day(), this.defaultTime()).toISOString();
       const row = await this.api.addFood({ day: this.day(), eatenAt, name: food.name, kcal: food.kcal, proteinG: food.protein_g, savedFoodId: food.id });
       await this.bump(food);
       this.commit([...this.entries(), row]);
-    } catch {
-      this.toast.show(SAVE_FAILED);
-    }
+    });
   }
 
   private async bump(food: SavedFoodRow): Promise<void> {
@@ -5740,33 +6050,27 @@ export class FoodPage {
   protected async saveEdit(line: FoodLine, name: HTMLInputElement, kcal: HTMLInputElement, protein: HTMLInputElement, time: HTMLInputElement): Promise<void> {
     const parsed = parseFood({ name: name.value, kcal: kcal.value, protein: protein.value, time: time.value }, this.day());
     if (!parsed.ok) return this.toast.show(parsed.error);
-    try {
+    await this.run(async () => {
       await this.api.updateFood(line.id, { day: this.day(), ...parsed.value, savedFoodId: null });
       this.commit(this.entries().map((e) => (e.id === line.id ? { ...e, name: parsed.value.name, kcal: parsed.value.kcal, protein_g: parsed.value.proteinG, eaten_at: parsed.value.eatenAt } : e)));
       this.editing.set(null);
-    } catch {
-      this.toast.show(SAVE_FAILED);
-    }
+    });
   }
 
   protected async remove(line: FoodLine): Promise<void> {
     if (this.confirmDelete() !== line.id) return this.confirmDelete.set(line.id);
-    try {
+    await this.run(async () => {
       await this.api.deleteFood(line.id);
       this.commit(this.entries().filter((e) => e.id !== line.id));
       this.editing.set(null);
-    } catch {
-      this.toast.show(SAVE_FAILED);
-    }
+    });
   }
 
   protected async deleteSaved(food: SavedFoodRow): Promise<void> {
-    try {
+    await this.run(async () => {
       await this.api.deleteSavedFood(food.id);
       this.saved.update((list) => list.filter((s) => s.id !== food.id));
-    } catch {
-      this.toast.show(SAVE_FAILED);
-    }
+    });
   }
 }
 ```
@@ -6003,6 +6307,7 @@ import { daysLeft, parseChallengeTarget, parseCountdown } from './settings-forms
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="card" aria-label="Countdowns">
+      <fieldset class="m-0 min-w-0 border-0 p-0" [disabled]="store.saving()">
       <p class="label mb-1 text-count">Countdowns</p>
       @for (c of upcoming(); track c.id) {
         <div class="border-t border-line py-2 first:border-t-0" role="group" [attr.aria-label]="c.title">
@@ -6055,6 +6360,7 @@ import { daysLeft, parseChallengeTarget, parseCountdown } from './settings-forms
       @if (error(); as e) {
         <p class="mt-1 text-sm text-kcal" role="alert">{{ e }}</p>
       }
+      </fieldset>
       @if (past().length) {
         <p class="label mt-3 text-muted">Past</p>
         @for (c of past(); track c.id) {
@@ -6065,7 +6371,7 @@ import { daysLeft, parseChallengeTarget, parseCountdown } from './settings-forms
   `,
 })
 export class CountdownsSection {
-  private readonly store = inject(TrackerStore);
+  protected readonly store = inject(TrackerStore);
   private readonly api = inject(TrackerApi);
   protected readonly editing = signal<string | null>(null);
   protected readonly adding = signal<string | null>(null);
@@ -6161,6 +6467,7 @@ const SLOT_LABEL: Record<Slot, string> = { morning: 'morning', night: 'night', a
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="card" aria-label="Habits">
+      <fieldset class="m-0 min-w-0 border-0 p-0" [disabled]="store.saving()">
       <p class="label mb-1 text-routine">Habits</p>
       @for (h of list(); track h.id; let i = $index, first = $first, last = $last) {
         <div class="border-t border-line py-1.5 first:border-t-0">
@@ -6226,11 +6533,12 @@ const SLOT_LABEL: Record<Slot, string> = { morning: 'morning', night: 'night', a
       @if (error(); as e) {
         <p class="mt-1 text-sm text-kcal" role="alert">{{ e }}</p>
       }
+      </fieldset>
     </section>
   `,
 })
 export class HabitsSection {
-  private readonly store = inject(TrackerStore);
+  protected readonly store = inject(TrackerStore);
   private readonly api = inject(TrackerApi);
   protected readonly palette = HABIT_PALETTE;
   protected readonly weekdays = WEEKDAYS;
@@ -6306,6 +6614,7 @@ import { parseTargets } from './settings-forms';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="card" aria-label="Targets">
+      <fieldset class="m-0 min-w-0 border-0 p-0" [disabled]="store.saving()">
       <p class="label mb-1 text-steps">Targets</p>
       <form class="grid grid-cols-[1fr_7rem] items-center gap-1.5 text-sm" (submit)="save($event, steps.value, kcal.value)">
         <label for="step-goal">Steps</label>
@@ -6320,6 +6629,7 @@ import { parseTargets } from './settings-forms';
       @if (saved()) {
         <p class="mt-1 text-sm text-steps" role="status">Saved</p>
       }
+      </fieldset>
     </section>
   `,
 })
@@ -6356,6 +6666,7 @@ import { isActiveOn } from '../../domain/visibility';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="card" aria-label="Fasting">
+      <fieldset class="m-0 min-w-0 border-0 p-0" [disabled]="store.saving()">
       <div class="flex items-center justify-between">
         <p class="label text-weekly">Fasting</p>
         <button type="button" role="switch" aria-label="Fasting on" [attr.aria-checked]="enabled()" (click)="setEnabled(!enabled())"
@@ -6384,11 +6695,12 @@ import { isActiveOn } from '../../domain/visibility';
       @if (saved()) {
         <p class="mt-1 text-sm text-steps" role="status">Saved</p>
       }
+      </fieldset>
     </section>
   `,
 })
 export class FastingSection {
-  private readonly store = inject(TrackerStore);
+  protected readonly store = inject(TrackerStore);
   private readonly api = inject(TrackerApi);
   protected readonly enabled = computed(() => this.store.goals().fastingEnabled);
   protected readonly draft = linkedSignal<EatingWindow[]>(() => this.store.goals().windows.map((w) => ({ ...w })));
@@ -6448,6 +6760,7 @@ import { TrackerStore } from '../../data/tracker.store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="card" aria-label="iPhone Shortcut">
+      <fieldset class="m-0 min-w-0 border-0 p-0" [disabled]="store.saving()">
       <p class="label mb-1 text-muted">iPhone Shortcut</p>
       <p class="flex justify-between text-sm"><span>Status</span>
         <span [class.text-steps]="!!store.lastSyncAt()" [class.text-muted]="!store.lastSyncAt()">{{ status() }}</span></p>
@@ -6471,6 +6784,7 @@ import { TrackerStore } from '../../data/tracker.store';
           </div>
         }
       </div>
+      </fieldset>
       <a class="mt-2 inline-block text-sm font-semibold text-routine" [href]="docsUrl" target="_blank" rel="noopener">Setup steps →</a>
     </section>
   `,
@@ -6793,7 +7107,7 @@ git commit -m "Add report card screen" -m "Co-Authored-By: Claude Opus 5.5 <nore
 ### Task 15: Live test harness — Playwright end-to-end, live functions, security
 
 **Files:**
-- Create: `playwright.config.ts`, `e2e/helpers.ts`, `e2e/auth.spec.ts`, `e2e/today.spec.ts`, `e2e/food.spec.ts`, `e2e/fasting.spec.ts`, `e2e/rollover.spec.ts`, `e2e/countdown.spec.ts`, `e2e/offline.spec.ts`
+- Create: `playwright.config.ts`, `e2e/helpers.ts`, `e2e/auth.spec.ts`, `e2e/today.spec.ts`, `e2e/food.spec.ts`, `e2e/fasting.spec.ts`, `e2e/rollover.spec.ts`, `e2e/countdown.spec.ts`, `e2e/offline.spec.ts`, `e2e/errors.spec.ts`
 - Create: `scripts/live/security-check.mjs`, `scripts/live/functions-check.mjs`, `.github/workflows/live-tests.yml`
 - Modify: `package.json` (devDependency + scripts), `.gitignore`, `tsconfig.json` (exclude `e2e/` from the Angular build is automatic — `tsconfig.app.json` only includes `src/`)
 
@@ -6829,17 +7143,39 @@ In `package.json` `"scripts"`, add:
 Create `scripts/live/security-check.mjs`:
 
 ```js
-// Proves row-level security: the test user only ever sees its own rows, can't write rows for anyone else,
-// and a signed-out client can read nothing and call no RPCs.
+// Proves row-level security on EVERY table: the test user only sees its own rows, can't create rows for
+// anyone else, can't hand its own rows to anyone else, and a signed-out client can read nothing and call no RPCs.
+// Each attempt uses otherwise-valid data (real foreign keys), so the only possible rejection is RLS (42501).
 import assert from 'node:assert/strict';
 import { anon, resetUser, signIn, TABLES } from './env.mjs';
 
 const { db, userId } = await signIn();
 await resetUser(db, userId);
 
+const day = '2026-10-19';
+const { data: habit } = await db.from('habits').select('id').limit(1).single();
+const { data: countdown } = await db.from('countdowns').select('id').limit(1).single();
+const { data: saved, error: savedError } = await db.from('saved_foods').insert({ name: 'x', kcal: 1 }).select('id').single();
+assert.ifError(savedError);
+
+// Give the test user a row in every table (settings, habits and countdowns already exist from setup).
+const own = {
+  habit_checks: { habit_id: habit.id, day },
+  challenges: { countdown_id: countdown.id, habit_id: habit.id, target_days: 1, start_day: day },
+  steps_daily: { day, count: 1 },
+  workouts: { started_at: new Date().toISOString(), day, source: 'manual' },
+  food_entries: { day, name: 'x', kcal: 1, saved_food_id: saved.id },
+  tasks: { title: 'x', month: '2026-10-01' },
+};
+for (const [table, row] of Object.entries(own)) {
+  const { error } = await db.from(table).insert(row);
+  assert.ifError(error);
+}
+
 for (const table of TABLES) {
   const { data, error } = await db.from(table).select('user_id');
   assert.ifError(error);
+  assert.ok(data.length > 0, `${table}: expected at least one own row`);
   assert.ok(data.every((r) => r.user_id === userId), `${table}: returned another user's rows`);
 }
 
@@ -6848,15 +7184,23 @@ const foreignRows = {
   settings: { user_id: stranger },
   countdowns: { user_id: stranger, title: 'x', target_date: '2030-01-01' },
   habits: { user_id: stranger, name: 'x', color: '#FFFFFF', frequency: 'daily' },
-  steps_daily: { user_id: stranger, day: '2026-10-19', count: 1 },
-  workouts: { user_id: stranger, started_at: new Date().toISOString(), day: '2026-10-19', source: 'manual' },
+  habit_checks: { user_id: stranger, habit_id: habit.id, day: '2026-10-20' },
+  challenges: { user_id: stranger, countdown_id: countdown.id, habit_id: habit.id, target_days: 1, start_day: day },
+  steps_daily: { user_id: stranger, day: '2026-10-20', count: 1 },
+  workouts: { user_id: stranger, started_at: new Date(Date.now() - 60_000).toISOString(), day, source: 'manual' },
   saved_foods: { user_id: stranger, name: 'x', kcal: 1 },
-  food_entries: { user_id: stranger, day: '2026-10-19', name: 'x', kcal: 1 },
+  food_entries: { user_id: stranger, day, name: 'x', kcal: 1 },
   tasks: { user_id: stranger, title: 'x', month: '2026-10-01' },
 };
+assert.deepEqual(Object.keys(foreignRows).sort(), [...TABLES].sort(), 'every table is covered');
 for (const [table, row] of Object.entries(foreignRows)) {
   const { error } = await db.from(table).insert(row);
   assert.equal(error?.code, '42501', `${table}: insert for another user was not blocked by RLS (${error?.message ?? 'accepted'})`);
+}
+
+for (const table of TABLES) {
+  const { error } = await db.from(table).update({ user_id: stranger }).eq('user_id', userId);
+  assert.equal(error?.code, '42501', `${table}: handing an own row to another user was not blocked (${error?.message ?? 'accepted'})`);
 }
 
 const signedOut = anon();
@@ -6869,6 +7213,7 @@ for (const fn of ['ensure_setup', 'rotate_sync_token']) {
   assert.ok(error, `${fn}: callable while signed out`);
 }
 
+await resetUser(db, userId);
 console.log('security-check passed');
 ```
 
@@ -6886,8 +7231,9 @@ import { env, resetUser, signIn } from './env.mjs';
 
 const { db, userId } = await signIn();
 await resetUser(db, userId);
-const { data: token, error: tokenError } = await db.rpc('rotate_sync_token');
-assert.ifError(tokenError);
+const issued = await db.rpc('rotate_sync_token');
+assert.ifError(issued.error);
+let token = issued.data;
 
 async function call(fn, body, auth = `Bearer ${token}`) {
   const res = await fetch(`${env.url}/functions/v1/${fn}`, {
@@ -6903,10 +7249,24 @@ assert.deepEqual(await call('sync', {}, null), { status: 401, body: TOKEN_ERROR 
 assert.deepEqual(await call('sync', {}, 'Bearer wrong'), { status: 401, body: TOKEN_ERROR });
 assert.deepEqual(await call('food-guard', {}, 'Bearer wrong'), { status: 401, body: TOKEN_ERROR });
 
+// Rotating invalidates the old token at once; the new one works straight away.
+const oldToken = token;
+const rotated = await db.rpc('rotate_sync_token');
+assert.ifError(rotated.error);
+token = rotated.data;
+assert.equal((await call('sync', { ping: '1' }, `Bearer ${oldToken}`)).status, 401, 'old token rejected after rotation');
+assert.equal((await call('food-guard', { ping: '1' }, `Bearer ${oldToken}`)).status, 401, 'old token rejected by food-guard too');
+assert.equal((await call('sync', { ping: '1' })).status, 200, 'new token accepted');
+
 assert.deepEqual(await call('sync', 'not json'), { status: 400, body: { error: 'Body must be JSON' } });
 assert.deepEqual((await call('sync', { steps: [{ date: '2020-01-01', count: 1 }] })).body, { error: 'steps[0].date must be a recent date (yyyy-MM-dd)' });
 
 const calendarToday = istDayOf(new Date());
+const calendarYesterday = istDayOf(new Date(Date.now() - 86_400_000));
+
+// A partial Health count first; the fuller one later must replace it.
+assert.equal((await call('sync', { steps: { date: calendarToday, count: 5000 } })).status, 200);
+
 const start = new Date(Date.now() - 60 * 60_000).toISOString();
 const quirky = { steps: { date: calendarToday, count: '7842.4' }, workouts: [{ start, durationMin: '52', name: 'Traditional Strength Training' }] };
 const first = await call('sync', quirky);
@@ -6920,7 +7280,19 @@ assert.equal(again.status, 200);
 const { data: workouts } = await db.from('workouts').select('source, duration_min');
 assert.deepEqual(workouts, [{ source: 'health', duration_min: 52 }], 'a re-sent workout is not duplicated');
 const { data: steps } = await db.from('steps_daily').select('count').eq('day', calendarToday).single();
-assert.equal(steps.count, 7842);
+assert.equal(steps.count, 7842, 'the corrected total replaced the partial one');
+
+// One bad item rejects the whole request and saves nothing from it.
+const partial = await call('sync', { steps: [{ date: calendarYesterday, count: 999 }, { date: '2020-01-01', count: 1 }] });
+assert.equal(partial.status, 400);
+const { data: none } = await db.from('steps_daily').select('count').eq('day', calendarYesterday);
+assert.deepEqual(none, [], 'a partly invalid batch saved nothing');
+
+// A user_id in the payload is ignored: the row lands on the token's owner.
+const stranger = '00000000-0000-0000-0000-000000000001';
+assert.equal((await call('sync', { user_id: stranger, steps: { date: calendarYesterday, count: 123, user_id: stranger } })).status, 200);
+const { data: mine } = await db.from('steps_daily').select('user_id, count').eq('day', calendarYesterday).single();
+assert.deepEqual(mine, { user_id: userId, count: 123 });
 
 assert.equal((await call('sync', '')).status, 200, 'an empty body is accepted');
 
@@ -7056,9 +7428,16 @@ test('rejects a wrong password, signs in, and signs out', async ({ page }) => {
   await expect(page.getByRole('alert')).toHaveText("Email or password didn't match");
 
   await login(page);
+  await page.getByRole('checkbox', { name: /AM skincare/ }).click();
   await page.getByRole('link', { name: /Settings/ }).click();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/login$/);
+
+  // The previous session's data must be gone, not just hidden behind the login page.
+  await page.goBack();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByLabel("Today's score")).toHaveCount(0);
+  await expect(page.getByRole('checkbox', { name: /AM skincare/ })).toHaveCount(0);
 });
 ```
 
@@ -7255,10 +7634,34 @@ test('going offline shows the banner and disables ticking', async ({ page, conte
 });
 ```
 
+Create `e2e/errors.spec.ts`:
+
+```ts
+import { expect, test } from '@playwright/test';
+import { resetTestUser } from './helpers';
+
+test.beforeEach(resetTestUser);
+
+test('a failed data load shows Retry, and Retry recovers', async ({ page }) => {
+  await page.route('**/rest/v1/**', (route) => route.abort());
+  await page.goto('/login');
+  await page.getByPlaceholder('Email').fill(process.env['E2E_EMAIL']!);
+  await page.getByPlaceholder('Password').fill(process.env['E2E_PASSWORD']!);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page.getByRole('alert')).toContainText("Couldn't load your data");
+
+  await page.unroute('**/rest/v1/**');
+  await page.getByRole('button', { name: 'Retry' }).click();
+  await expect(page.getByLabel("Today's score")).toBeVisible();
+});
+```
+
+(The "no private data cached" rule is enforced by the Deploy workflow's `ngsw-config.json` check from Task 1, because the dev server Playwright uses doesn't run the service worker.)
+
 - [ ] **Step 6: Run the end-to-end suite**
 
 Run: `npm run test:e2e`
-Expected: 9 tests × 2 projects (phone, desktop) = **18 passed**. If a selector misses, run `npx playwright test --headed --project=phone e2e/<file>` to watch it, fix the selector or the bug it found, and re-run. Do not loosen an assertion to make it pass.
+Expected: 10 tests × 2 projects (phone, desktop) = **20 passed**. If a selector misses, run `npx playwright test --headed --project=phone e2e/<file>` to watch it, fix the selector or the bug it found, and re-run. Do not loosen an assertion to make it pass.
 
 - [ ] **Step 7: Manual GitHub workflow for the live suite**
 
@@ -7357,12 +7760,14 @@ Shortcuts app → **+** → tap the name at the top → **Countdown Sync**. Add 
       - Method **POST**
       - Headers: `Authorization` = `Bearer ` then the *Token* variable
       - Request Body **JSON**: add field `steps` of type **Dictionary** with two fields: `date` (Text) = *Formatted Date*, `count` (Number) = *Repeat Item* (Value).
+   3. **Get Dictionary Value** → key `error` in *Contents of URL* → **If** it **has any value** → **Show Notification** `Countdown sync failed: ` + *Dictionary Value* → **Stop This Shortcut** → **End If**. (A failed day must not hide behind a later successful nudge. Re-running the Shortcut is always safe: nothing gets duplicated.)
 4. **End Repeat** (added automatically).
 5. *(Only if your phone can read Workouts — see Task 0)* **Find Health Samples** → Type **Workouts** → Start Date **is in the last 2 days**.
 6. **Repeat with Each** (those samples). Inside:
    1. **Format Date** → *Repeat Item → Start Date* → **ISO 8601**, Include Time on.
    2. **Get Time Between Dates** → from *Repeat Item → Start Date* to *Repeat Item → End Date* → **Minutes**.
    3. **Get Contents of URL** → same URL/method/header → JSON field `workouts` (Dictionary): `start` (Text) = *Formatted Date*, `durationMin` (Number) = *Time Between Dates*, `name` (Text) = *Repeat Item → Type*.
+   4. The same error check as step 3.3 (Get Dictionary Value `error` → If has any value → Show Notification → Stop This Shortcut).
 7. **Get Contents of URL** → same URL/method/header → JSON field `ping` (Text) = `1`. (This last call returns the nudge.)
 8. **Get Dictionary Value** → key `error` in *Contents of URL*.
 9. **If** *Dictionary Value* **has any value** → **Show Notification** `Countdown sync failed: ` + *Dictionary Value*.
@@ -7379,16 +7784,18 @@ New shortcut → name **Food Guard**:
 
 1. **Text** → paste the same token → **Set Variable** `Token`.
 2. **Get Contents of URL** → `https://<ref>.supabase.co/functions/v1/food-guard` → POST, header `Authorization` = `Bearer ` + *Token*, JSON field `ping` (Text) = `1`.
-3. **Get Dictionary Value** → key `message` in *Contents of URL*.
-4. **If** *Dictionary Value* **has any value** → **Go to Home Screen** → **Show Notification** *Dictionary Value* → **End If**.
+3. **Get Dictionary Value** → key `error` in *Contents of URL* → **If** it **has any value** → **Show Notification** `Food Guard couldn't check: ` + *Dictionary Value* (the app stays open — this is "unknown", not "allowed").
+4. **Otherwise** → **Get Dictionary Value** → key `message` in *Contents of URL* → **If** it **has any value** → **Go to Home Screen** → **Show Notification** *Dictionary Value* → **End If**.
+5. **End If**.
 
 **Automation:** Automation → **+** → **App** → **Choose** → tick Swiggy, Zomato, Zepto, Blinkit, Domino's, McDonald's (and any other food apps) and the **App Store** → **Is Opened** → **Run Immediately** → Next → **Food Guard**. Turn **Notify When Run** off.
 
-When it blocks: outside your eating windows (12–1 AM, 11 AM–1 PM by default), and once today's logged calories reach your target. Shortcuts can't pick the App Store's "Food & Drink" category, so a newly installed food app needs ticking in this automation. If the server can't be reached, nothing is blocked.
+When it blocks: outside your eating windows (12–1 AM, 11 AM–1 PM by default), and once today's logged calories reach your target. It's a **deterrent, not a lock**: you can switch the automation off, ordering in Safari isn't covered, and Shortcuts can't pick the App Store's "Food & Drink" category, so a newly installed food app needs ticking in this automation. If the server can't be reached, nothing is blocked.
 
 ## If something goes wrong
 
-- **"Countdown sync failed: Token not recognised…"** — you rotated the token. Paste the new one into **both** shortcuts' Text action.
+- **"Countdown sync failed: Token not recognised…"** or **"Food Guard couldn't check: Token not recognised…"** — you rotated the token. Paste the new one into **both** shortcuts' Text action.
+- **Lost the new token before pasting it** (closed the page, copy failed) — Settings → iPhone Shortcut → Rotate token again (tap twice) and paste the fresh one into both shortcuts. The token is never stored anywhere readable, so a fresh one is always the fix.
 - **No notification at all** — open the Shortcuts app → Automation and check both automations are on and set to Run Immediately.
 - **Everything fails after a long break** — the free Supabase project pauses after 7 days without use. Supabase dashboard → your project → **Restore**.
 ```
@@ -7405,7 +7812,8 @@ Run on the iPhone after setup. Tick each case; note anything that doesn't match 
 | # | Area | Steps | Expected |
 |---|---|---|---|
 | 1 | Install | Add to Home Screen from Safari, open from the icon | Black splash, "Countdown" under a three-ring icon, opens full screen (no Safari bars) |
-| 2 | Offline launch | Airplane mode on, open the app | App opens with the last data and "Offline — changes won't save"; ticks are disabled |
+| 2 | Offline launch | Airplane mode on, open the app | App opens with "You're offline — connect to load your data" and a Retry button (no data is stored on the phone); airplane mode off → Retry loads everything |
+| 2b | Signal drops while open | With the app open, airplane mode on | Data stays on screen with "Offline — changes won't save"; ticks are disabled |
 | 3 | Sync by tap | Today → ↻ Sync iPhone | Shortcuts runs Countdown Sync; back in the app, steps match the Health app; "Steps synced <now>" |
 | 4 | Workout | Log a workout in Strong, then ↻ Sync | Today's workout card shows it with its duration |
 | 5 | Nudge | Leave PM skincare unticked, run Countdown Sync | Notification "Left today: PM skincare, …" |
@@ -7416,6 +7824,9 @@ Run on the iPhone after setup. Tick each case; note anything that doesn't match 
 | 10 | Guard — target | In a window, log food to ≥ the calorie target, open a food app | Bounced + "🛑 … kcal today — target hit. Kitchen's closed." |
 | 11 | Guard — App Store | While blocked (case 8 or 10), open the App Store | Bounced to the home screen |
 | 12 | Guard — no network | Airplane mode, open a food app | App opens (fails open); Shortcuts may show a network error banner |
+| 12b | Guard — old token | Rotate the token in Settings but don't update Food Guard; open a food app | Notification "Food Guard couldn't check: Token not recognised…"; the app stays open. Paste the new token → case 8 works again |
+| 12c | Sync — failure mid-run | Airplane mode on, run Countdown Sync | "Countdown sync failed: …" and the Shortcut stops; airplane mode off, run again → steps appear, nothing duplicated |
+| 16 | Sign out | Settings → Sign out, then reopen the app | Login screen; none of your data is visible until you sign in again |
 | 13 | 4 AM rollover | Tick a routine at ~1 AM; check again after 4 AM | At 1 AM it counts for the previous day; after 4 AM Today shows the new date with routines unticked |
 | 14 | Perfect Day | Close every ring in a day | Confetti overlay once; not again after reopening the app that day |
 | 15 | Report card | On a countdown's date, open Today | "Today! 🪔" with "See your report card →"; the card shows a grade and stats |
@@ -7460,7 +7871,7 @@ npx ng build --base-href /countdown-tracker/
 npm run test:live
 ```
 
-Expected: all unit/component suites pass; 36 function tests pass; the build completes without errors (budget warnings are acceptable, errors are not); `setup-check passed`, `security-check passed`, `functions-check passed`, and 18 Playwright tests pass.
+Expected: all unit/component suites pass; 37 function tests pass; the build completes without errors (budget warnings are acceptable, errors are not); `setup-check passed`, `security-check passed`, `functions-check passed`, and 20 Playwright tests pass.
 
 - [ ] **Step 5: Commit, push, verify the deployment**
 
