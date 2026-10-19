@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
-import { weekdayShort } from '../../core/format';
+import { dayLabel, weekdayShort } from '../../core/format';
 import type { Day } from '../../domain/types';
-import type { RoutineGroupVm, WeeklyVm } from './today.vm';
+import type { IntervalLineVm, RoutineGroupVm, WeeklyVm } from './today.vm';
 
 @Component({
   selector: 'app-routines-card',
@@ -30,16 +30,26 @@ import type { RoutineGroupVm, WeeklyVm } from './today.vm';
           }
         </div>
       }
+      @for (l of intervals(); track l.habit.id) {
+        <div class="mt-1 flex items-center justify-between gap-2 border-t border-line pt-2 text-xs">
+          <span>{{ l.doneToday ? '✓ ' : '' }}{{ l.habit.emoji }} {{ l.habit.name }}{{ l.doneToday ? ' done' : '' }} · next {{ label(l.next) }}</span>
+          @if (l.doneToday) {
+            <button type="button" class="btn-quiet press !py-1 text-xs" [disabled]="disabled()" (click)="toggle.emit(l.habit.id)">Undo</button>
+          }
+        </div>
+      }
     </section>
   `,
 })
 export class RoutinesCard {
   readonly groups = input.required<RoutineGroupVm[]>();
   readonly weekly = input.required<WeeklyVm[]>();
+  readonly intervals = input<IntervalLineVm[]>([]);
   readonly today = input.required<Day>();
   readonly done = input.required<number>();
   readonly total = input.required<number>();
   readonly disabled = input(false);
   readonly toggle = output<string>();
   protected readonly weekday = weekdayShort;
+  protected readonly label = dayLabel;
 }

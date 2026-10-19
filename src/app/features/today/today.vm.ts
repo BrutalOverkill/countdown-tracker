@@ -1,4 +1,5 @@
-import { daysBetween, weekBlockRange } from '@shared/days';
+import { addDays, daysBetween, weekBlockRange } from '@shared/days';
+import { nextDueOn } from '@shared/interval';
 import { fastState, formatClock, toMinutes } from '@shared/windows';
 import { challengeProgress, type ChallengeProgress } from '../../domain/challenges';
 import { dayScore, isPerfect, type DayScore } from '../../domain/scoring';
@@ -12,6 +13,8 @@ export interface ChallengeGroupVm { countdownId: string; title: string; emoji: s
 export interface RoutineVm { habit: Habit; done: boolean }
 export interface RoutineGroupVm { slot: Slot; label: string; items: RoutineVm[] }
 export interface WeeklyVm { habit: Habit; doneDay: Day | null }
+export interface DueVm { habit: Habit; since: Day; overdueDays: number }
+export interface IntervalLineVm { habit: Habit; next: Day; doneToday: boolean }
 export type FastingVm =
   | { kind: 'open'; closesAt: string; minutesLeft: number; fraction: number }
   | { kind: 'fasting'; nextAt: string; minutesUntilNext: number; doneMinutes: number; fraction: number };
@@ -31,6 +34,8 @@ export interface TodayVm {
   routinesTotal: number;
   routines: RoutineGroupVm[];
   weekly: WeeklyVm[];
+  due: DueVm[];
+  intervals: IntervalLineVm[];
   workouts: readonly Workout[];
   challengeGroups: ChallengeGroupVm[];
   lastSyncAt: string | null;
@@ -83,6 +88,17 @@ export function buildTodayVm(i: TodayInput): TodayVm {
       return { habit, doneDay: days.at(-1) ?? null };
     });
 
+  const due: DueVm[] = [];
+  const intervals: IntervalLineVm[] = [];
+  for (const habit of active) {
+    if (habit.frequency !== 'interval' || habit.source !== 'manual' || habit.intervalDays === null || habit.intervalStart === null) continue;
+    const checks = ctx.history.checks.get(habit.id) ?? new Set<Day>();
+    const next = nextDueOn(today, habit.intervalStart, habit.intervalDays, checks);
+    if (checks.has(today)) intervals.push({ habit, next: addDays(today, habit.intervalDays), doneToday: true });
+    else if (today >= next) due.push({ habit, since: next, overdueDays: daysBetween(next, today) });
+    else intervals.push({ habit, next, doneToday: false });
+  }
+
   const upcoming = i.countdowns.filter((c) => c.targetDate >= today).sort((a, b) => a.targetDate.localeCompare(b.targetDate));
 
   const challengeGroups = upcoming
@@ -121,6 +137,8 @@ export function buildTodayVm(i: TodayInput): TodayVm {
     routinesTotal: manualDaily.length,
     routines,
     weekly,
+    due,
+    intervals,
     workouts: ctx.history.workouts.get(today) ?? [],
     challengeGroups,
     lastSyncAt: i.lastSyncAt,

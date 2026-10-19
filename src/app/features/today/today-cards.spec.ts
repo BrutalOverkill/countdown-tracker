@@ -5,6 +5,7 @@ import { habit } from '../../domain/testing';
 import { ChallengesCard } from './challenges-card';
 import { CountdownsCard } from './countdowns-card';
 import { FastingCard } from './fasting-card';
+import { DueCard } from './due-card';
 import { RoutinesCard } from './routines-card';
 import { ScoreCard } from './score-card';
 import { StepsTile } from './steps-tile';
@@ -74,7 +75,7 @@ describe('Today tiles', () => {
   it('RoutinesCard shows the count and emits the habit id when a pill is tapped', async () => {
     const am = habit('am', { name: 'AM skincare', emoji: '🧴' });
     const { fixture, el } = await render(RoutinesCard, {
-      groups: [{ slot: 'morning', label: 'Morning', items: [{ habit: am, done: false }] }], weekly: [], today: '2026-10-19', done: 0, total: 1, disabled: false,
+      groups: [{ slot: 'morning', label: 'Morning', items: [{ habit: am, done: false }] }], weekly: [], intervals: [], today: '2026-10-19', done: 0, total: 1, disabled: false,
     });
     expect(el.textContent).toContain('0/1');
     const emitted: string[] = [];
@@ -103,5 +104,27 @@ describe('Today tiles', () => {
     const { el } = await render(ChallengesCard, { group });
     for (const label of ['ON TRACK', 'BEHIND', 'WON 🏆', 'OUT OF REACH']) expect(el.textContent).toContain(label);
     expect(el.textContent).toContain('13 days left');
+  });
+
+  it('DueCard says due today, or overdue since the due day, and emits on Done', async () => {
+    const derma = habit('d', { name: 'Dermarolling', emoji: '🪡' });
+    const { fixture, el } = await render(DueCard, { due: { habit: derma, since: '2026-10-24', overdueDays: 2 } });
+    expect(el.textContent).toContain('🪡 Dermarolling');
+    expect(el.textContent).toContain('overdue since Sat 24 Oct (2 days)');
+    const emitted: string[] = [];
+    fixture.componentInstance.done.subscribe((id: string) => emitted.push(id));
+    (el.querySelector('button') as HTMLButtonElement).click();
+    expect(emitted).toEqual(['d']);
+    fixture.componentRef.setInput('due', { habit: derma, since: '2026-10-20', overdueDays: 0 });
+    await fixture.whenStable();
+    expect(el.textContent).toContain('due today');
+  });
+
+  it('RoutinesCard shows when an interval habit is next due', async () => {
+    const derma = habit('d', { name: 'Dermarolling', emoji: '🪡' });
+    const { el } = await render(RoutinesCard, {
+      groups: [], weekly: [], intervals: [{ habit: derma, next: '2026-10-24', doneToday: true }], today: '2026-10-20', done: 0, total: 0, disabled: false,
+    });
+    expect(el.textContent).toContain('✓ 🪡 Dermarolling done · next Sat 24 Oct');
   });
 });

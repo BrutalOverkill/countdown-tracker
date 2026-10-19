@@ -63,4 +63,14 @@ describe('buildTodayVm', () => {
     expect(behind.challengeGroups[0].footer).toBe('Need 12 of the next 13 days');
     expect(buildTodayVm(input({ challenges, ctx: ctx('2026-11-08') })).challengeGroups).toEqual([]);
   });
+
+  it('puts a due or overdue interval habit on the due list, and the rest on "next" lines', () => {
+    const derma = habit('d', { name: 'Dermarolling', frequency: 'interval', intervalDays: 4, intervalStart: '2026-10-20' });
+    const at = (today: string, ticks: string[]) => buildTodayVm(input({ habits: [derma], ctx: ctx(today, history({ checks: { d: ticks } })) }));
+    expect(at('2026-10-20', []).due).toEqual([{ habit: derma, since: '2026-10-20', overdueDays: 0 }]);
+    expect(at('2026-10-20', ['2026-10-20']).intervals).toEqual([{ habit: derma, next: '2026-10-24', doneToday: true }]);
+    expect(at('2026-10-22', ['2026-10-20']).intervals).toEqual([{ habit: derma, next: '2026-10-24', doneToday: false }]);
+    expect(at('2026-10-26', ['2026-10-20']).due).toEqual([{ habit: derma, since: '2026-10-24', overdueDays: 2 }]);
+    expect(at('2026-10-26', ['2026-10-20']).score.total).toBe(1);
+  });
 });

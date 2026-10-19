@@ -8,6 +8,7 @@ import { TrackerStore } from '../../data/tracker.store';
 import { CaloriesTile } from './calories-tile';
 import { ChallengesCard } from './challenges-card';
 import { CountdownsCard } from './countdowns-card';
+import { DueCard } from './due-card';
 import { FastingCard } from './fasting-card';
 import { RoutinesCard } from './routines-card';
 import { ScoreCard } from './score-card';
@@ -17,7 +18,7 @@ import { WorkoutCard } from './workout-card';
 
 @Component({
   selector: 'app-today-page',
-  imports: [ScoreCard, CountdownsCard, FastingCard, StepsTile, CaloriesTile, WorkoutCard, RoutinesCard, ChallengesCard],
+  imports: [ScoreCard, CountdownsCard, DueCard, FastingCard, StepsTile, CaloriesTile, WorkoutCard, RoutinesCard, ChallengesCard],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let v = vm();
@@ -35,6 +36,9 @@ import { WorkoutCard } from './workout-card';
                  matrix:rounded-xl matrix:border matrix:border-line matrix:bg-black matrix:text-white">◐</button>
       </div>
     </header>
+    @for (d of v.due; track d.habit.id) {
+      <app-due-card class="mb-2" [due]="d" [disabled]="!online()" (done)="store.toggleCheck($event, v.today)" />
+    }
     <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
       <app-countdowns-card class="col-span-2" [tiles]="v.countdowns" />
       <app-score-card [score]="v.score" [perfect]="v.perfect" [streak]="v.streak" />
@@ -43,7 +47,7 @@ import { WorkoutCard } from './workout-card';
         <app-fasting-card [fasting]="f" />
       }
       <app-calories-tile [kcal]="v.kcal" [goal]="v.kcalGoal" />
-      <app-routines-card class="col-span-2" [groups]="v.routines" [weekly]="v.weekly" [today]="v.today" [done]="v.routinesDone" [total]="v.routinesTotal"
+      <app-routines-card class="col-span-2" [groups]="v.routines" [weekly]="v.weekly" [intervals]="v.intervals" [today]="v.today" [done]="v.routinesDone" [total]="v.routinesTotal"
         [disabled]="!online()" (toggle)="store.toggleCheck($event, v.today)" />
       <app-workout-card class="col-span-2" [workouts]="v.workouts" [disabled]="!online()" (trained)="store.addManualWorkout()" (remove)="store.removeWorkout($event)" />
       @for (g of v.challengeGroups; track g.countdownId) {

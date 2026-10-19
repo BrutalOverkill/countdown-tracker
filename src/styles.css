@@ -64,6 +64,11 @@ body {
   .tile[data-tone='blue'] { background: var(--color-tone-blue); }
   .tile[data-tone='violet'] { background: var(--color-tone-violet); }
   .tile[data-tone='orange'] { background: var(--color-tone-orange); }
+  .tile.due-card.is-overdue { background: #ff3b30; }
+  [data-theme='matrix'] .tile.due-card { border-color: var(--color-accent); background: #000; }
+  [data-theme='matrix'] .tile.due-card.is-overdue .text-sm { color: var(--color-accent); }
+  [data-theme='matrix'] .tile.due-card .label { color: var(--color-accent); }
+  [data-theme='matrix'] .tile.due-card .label::before { content: '● '; }
   [data-theme='matrix'] .tile, [data-theme='matrix'] .card { border-radius: 18px; border: 1px solid var(--color-line); background: #000; color: #f2f2f2; }
 
   .num { font-weight: 700; letter-spacing: -0.04em; line-height: 0.9; font-variant-numeric: tabular-nums; }
