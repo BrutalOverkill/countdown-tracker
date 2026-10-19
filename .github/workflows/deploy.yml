@@ -1,0 +1,46 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Private data must never be cached on devices (spec §10/§11): fail the deploy if API caching appears.
+      - run: node -e "if (require('./ngsw-config.json').dataGroups) { console.error('ngsw-config.json must not define dataGroups'); process.exit(1); }"
+      - run: npx ng test --watch=false
+      - run: npm run test:functions
+      - run: npx ng build --base-href /countdown-tracker/
+      # GitHub Pages serves 404.html for unknown paths, which lets the Angular router handle deep links.
+      - run: cp dist/countdown-tracker/browser/index.html dist/countdown-tracker/browser/404.html
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist/countdown-tracker/browser
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

@@ -1,0 +1,140 @@
+@import 'tailwindcss';
+
+@custom-variant matrix (&:where([data-theme='matrix'], [data-theme='matrix'] *));
+@custom-variant bento (&:where([data-theme='bento'], [data-theme='bento'] *));
+
+/* Bento values; [data-theme='matrix'] below redefines them. */
+@theme {
+  --font-sans: 'Space Grotesk Variable', -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'Space Mono', ui-monospace, monospace;
+  --font-dot: 'Doto Variable', 'Space Mono', monospace;
+  --color-bg: #000000;
+  --color-card: #161616;
+  --color-raised: #262626;
+  --color-line: #2a2a2a;
+  --color-muted: #8e8e93;
+  --color-accent: #c8ff00;
+  --color-steps: #c8ff00;
+  --color-kcal: #ff3d8b;
+  --color-routine: #3d7bff;
+  --color-count: #ffd60a;
+  --color-weekly: #8b5cf6;
+  --color-streak: #ff7a1a;
+  --color-tone-pink: #ff3d8b;
+  --color-tone-lime: #c8ff00;
+  --color-tone-blue: #3d7bff;
+  --color-tone-violet: #8b5cf6;
+  --color-tone-orange: #ff7a1a;
+}
+
+[data-theme='matrix'] {
+  --font-sans: 'Space Mono', ui-monospace, monospace;
+  --color-card: #000000;
+  --color-raised: #111111;
+  --color-muted: #8a8a8a;
+  --color-accent: #ff3b30;
+  --color-steps: #f2f2f2;
+  --color-kcal: #ff3b30;
+  --color-routine: #f2f2f2;
+  --color-count: #ff3b30;
+  --color-weekly: #f2f2f2;
+  --color-streak: #ff3b30;
+}
+
+html {
+  background: var(--color-bg);
+  color: #f2f2f2;
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@layer components {
+  /* A tile is the building block of every screen; data-tone picks a Bento colour block. */
+  .tile, .card { position: relative; overflow: hidden; border-radius: 22px; background: var(--color-card); padding: 0.85rem; color: #fff; }
+  .tile[data-tone] { color: #000; }
+  .tile[data-tone='pink'] { background: var(--color-tone-pink); }
+  .tile[data-tone='lime'] { background: var(--color-tone-lime); }
+  .tile[data-tone='blue'] { background: var(--color-tone-blue); }
+  .tile[data-tone='violet'] { background: var(--color-tone-violet); }
+  .tile[data-tone='orange'] { background: var(--color-tone-orange); }
+  [data-theme='matrix'] .tile, [data-theme='matrix'] .card { border-radius: 18px; border: 1px solid var(--color-line); background: #000; color: #f2f2f2; }
+
+  .num { font-weight: 700; letter-spacing: -0.04em; line-height: 0.9; font-variant-numeric: tabular-nums; }
+  [data-theme='matrix'] .num { font-family: var(--font-dot); font-weight: 900; letter-spacing: 0.02em; }
+
+  .label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+  .tile[data-tone] .label { opacity: 0.75; }
+  [data-theme='matrix'] .label { font-family: var(--font-mono); font-weight: 400; letter-spacing: 0.14em; color: var(--color-muted); opacity: 1; }
+
+  .muted { font-size: 12px; color: var(--color-muted); }
+  .tile[data-tone] .muted { color: rgb(0 0 0 / 0.65); }
+  [data-theme='matrix'] .tile .muted { color: var(--color-muted); }
+
+  .field { width: 100%; border-radius: 14px; background: var(--color-raised); padding: 0.55rem 0.8rem; font-size: 0.875rem; color: #fff; outline: none; }
+  .field::placeholder { color: var(--color-muted); }
+  .field:focus { box-shadow: 0 0 0 2px var(--color-accent); }
+  [data-theme='matrix'] .field { border-radius: 10px; border: 1px solid var(--color-line); background: #000; font-family: var(--font-mono); }
+
+  .btn { border-radius: 999px; background: var(--color-accent); padding: 0.55rem 1rem; font-size: 0.875rem; font-weight: 800; color: #000; }
+  .btn-quiet { border-radius: 999px; background: var(--color-raised); padding: 0.55rem 1rem; font-size: 0.875rem; font-weight: 600; color: #fff; }
+  .btn:disabled, .btn-quiet:disabled { opacity: 0.4; }
+  [data-theme='matrix'] .btn { border-radius: 10px; background: #f2f2f2; text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.75rem; }
+  [data-theme='matrix'] .btn-quiet { border-radius: 10px; border: 1px solid var(--color-line); background: #000; text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.75rem; }
+
+  /* Routine ticks: lime pills in Bento, ● / ○ in Matrix. */
+  .pill { display: inline-flex; align-items: center; gap: 0.3rem; border-radius: 999px; background: var(--color-raised); padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 700; color: #bbb; }
+  .pill::before { content: '○'; }
+  .pill[aria-checked='true'] { background: var(--color-accent); color: #000; }
+  .pill[aria-checked='true']::before { content: '✓'; }
+  [data-theme='matrix'] .pill { background: transparent; padding: 0.15rem 0; font-weight: 400; color: var(--color-muted); }
+  [data-theme='matrix'] .pill::before { color: #555; }
+  [data-theme='matrix'] .pill[aria-checked='true'] { background: transparent; color: #f2f2f2; }
+  [data-theme='matrix'] .pill[aria-checked='true']::before { content: '●'; color: var(--color-accent); }
+
+  .chip { border-radius: 6px; background: var(--color-raised); padding: 1px 6px; font-size: 9px; font-weight: 800; color: var(--color-muted); }
+  .chip[data-status='on_track'] { color: var(--color-steps); }
+  .chip[data-status='behind'] { color: var(--color-kcal); }
+  .chip[data-status='won'] { color: var(--color-count); }
+
+  .tab.is-active { background: var(--color-accent); color: #000; font-weight: 700; }
+  [data-theme='matrix'] .tab { text-transform: uppercase; letter-spacing: 0.12em; font-size: 10px; }
+  [data-theme='matrix'] .tab.is-active { background: transparent; color: #f2f2f2; }
+  [data-theme='matrix'] .tab.is-active::before { content: '●'; color: var(--color-accent); }
+
+  /* Motion (spec §4.0.1). */
+  .press { transition: transform 0.15s cubic-bezier(0.3, 1.6, 0.5, 1); }
+  .press:active { transform: scale(0.97); }
+  .pop { animation: pop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1); }
+  .flicker { display: inline-block; transform-origin: 50% 90%; animation: flicker 2.4s ease-in-out infinite; }
+  .ring-arc, .meter-fill { transition: stroke-dasharray 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.15), width 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.15); }
+}
+
+@keyframes pop {
+  40% { transform: scale(1.12); }
+}
+
+@keyframes flicker {
+  30% { transform: scale(1.08) rotate(-4deg); }
+  60% { transform: scale(0.96) rotate(3deg); }
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.25s;
+}
+
+/* iOS "Reduce Motion" turns every animation and transition off. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
