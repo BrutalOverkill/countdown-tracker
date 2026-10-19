@@ -36,6 +36,8 @@ export class TrackerStore {
   private loadedFrom: Day | null = null;
   private lastLoad = 0;
   private readonly queues = new Map<string, Promise<unknown>>();
+  // Per habit+day: writes still in flight, and the state the server last confirmed.
+  private readonly checkWrites = new Map<string, { pending: number; confirmed: boolean }>();
 
   /** Loads data for `userId`, first discarding anything held for a different account. */
   async load(userId: string): Promise<void> {
@@ -71,6 +73,7 @@ export class TrackerStore {
     this.loadedFrom = null;
     this.lastLoad = 0;
     this.queues.clear();
+    this.checkWrites.clear();
   }
 
   async reload(gen = this.generation): Promise<void> {
@@ -115,14 +118,23 @@ export class TrackerStore {
   async toggleCheck(habitId: string, day: Day): Promise<void> {
     if (!this.online.online()) return this.toast.show(OFFLINE);
     const gen = this.generation;
-    const on = !(this.history().checks.get(habitId)?.has(day) ?? false);
+    const key = `${habitId}|${day}`;
+    const shown = this.history().checks.get(habitId)?.has(day) ?? false;
+    const state = this.checkWrites.get(key) ?? { pending: 0, confirmed: shown };
+    this.checkWrites.set(key, state);
+    const on = !shown;
+    state.pending++;
     this.history.update((h) => withCheck(h, habitId, day, on));
     try {
-      await this.enqueue(`${habitId}|${day}`, () => this.api.setCheck(habitId, day, on));
+      await this.enqueue(key, () => this.api.setCheck(habitId, day, on));
+      state.confirmed = on;
     } catch {
       if (gen !== this.generation) return;
-      this.history.update((h) => withCheck(h, habitId, day, !on));
       this.toast.show(SAVE_FAILED);
+      // Only the last write in flight decides; it puts back what the server last confirmed.
+      if (state.pending === 1) this.history.update((h) => withCheck(h, habitId, day, state.confirmed));
+    } finally {
+      if (--state.pending === 0 && gen === this.generation) this.checkWrites.delete(key);
     }
   }
 

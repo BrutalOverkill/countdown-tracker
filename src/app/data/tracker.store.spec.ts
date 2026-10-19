@@ -106,4 +106,16 @@ describe('TrackerStore', () => {
     expect(store.history().checks.get('h1')?.has('2026-10-19') ?? false).toBe(false);
     expect(toast.message()).toBe("Couldn't save — check your connection");
   });
+
+  it('shows what the server has after two quick taps that both fail', async () => {
+    const { store } = setup({ setCheck: vi.fn().mockRejectedValue(new Error('down')) });
+    await Promise.all([store.toggleCheck('h1', '2026-10-19'), store.toggleCheck('h1', '2026-10-19')]);
+    expect(store.history().checks.get('h1')?.has('2026-10-19') ?? false).toBe(false);
+  });
+
+  it('keeps the first tick when only the second, untick write fails', async () => {
+    const { store } = setup({ setCheck: vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('down')) });
+    await Promise.all([store.toggleCheck('h1', '2026-10-19'), store.toggleCheck('h1', '2026-10-19')]);
+    expect(store.history().checks.get('h1')?.has('2026-10-19') ?? false).toBe(true);
+  });
 });
