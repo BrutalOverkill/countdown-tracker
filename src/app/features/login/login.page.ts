@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 
@@ -25,6 +25,13 @@ export class LoginPage {
   private readonly router = inject(Router);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
+
+  constructor() {
+    // A session that turns up later (refreshed once back online) skips the form.
+    effect(() => {
+      if (this.auth.session()) void this.router.navigateByUrl('/today');
+    });
+  }
 
   protected async submit(event: Event, email: string, password: string): Promise<void> {
     event.preventDefault();

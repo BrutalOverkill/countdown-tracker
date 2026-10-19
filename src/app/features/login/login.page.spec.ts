@@ -1,12 +1,13 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { LoginPage } from './login.page';
 
 describe('LoginPage', () => {
-  const setup = (result: string | null) => {
+  const setup = (result: string | null, session = signal<unknown>(null)) => {
     const signIn = vi.fn().mockResolvedValue(result);
-    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: AuthService, useValue: { signIn } }] });
+    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: AuthService, useValue: { signIn, session } }] });
     const fixture = TestBed.createComponent(LoginPage);
     const el = fixture.nativeElement as HTMLElement;
     (el.querySelector('input[type=email]') as HTMLInputElement).value = ' me@example.com ';
@@ -26,6 +27,17 @@ describe('LoginPage', () => {
     const { fixture, el } = setup(null);
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
     el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+    expect(navigate).toHaveBeenCalledWith('/today');
+  });
+
+  it('goes to Today when a stored session comes back (e.g. refreshed once online)', async () => {
+    const session = signal<unknown>(null);
+    const { fixture } = setup(null, session);
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    await fixture.whenStable();
+    expect(navigate).not.toHaveBeenCalled();
+    session.set({ user: { id: 'u1' } });
     await fixture.whenStable();
     expect(navigate).toHaveBeenCalledWith('/today');
   });
