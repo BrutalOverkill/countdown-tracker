@@ -1,6 +1,6 @@
 # iPhone setup
 
-> **Workouts:** on Anvit's iPhone (checked 20 Oct 2026) Shortcuts can't read Workouts from Apple Health, so skip steps 5–6 below. After a Strong session, tap **Trained today ✓** on Today instead.
+> **Anvit's phone (set up 20 Oct 2026):** Shortcuts can't read Workouts from Apple Health, so tap **Trained today ✓** on Today after a Strong session. Countdown Sync was built **steps only**: steps 1–4 below without the per-day error check (3.3), and without the nudge (steps 5–11). Food Guard was built without the error branch (step 3): if it can't reach the server, the app simply opens. In the If actions, set the input's Type to **Text**, or Shortcuts may test a property like File Size instead.
 
 You need: the Countdown app open in Safari on the iPhone, and a **sync token** from Countdown → Settings → iPhone Shortcut → Generate token (copy it).
 
