@@ -104,4 +104,24 @@ describe('Settings sections', () => {
     expect(every.hidden).toBe(false);
     expect(every.value).toBe('4');
   });
+
+  it('HabitsSection still adds a habit when a hidden every-N-days field holds an out-of-range number', async () => {
+    const addHabit = vi.fn().mockResolvedValue(undefined);
+    TestBed.configureTestingModule({ providers: [{ provide: TrackerApi, useValue: fakeApi({ addHabit }) }] });
+    const fixture = TestBed.createComponent(HabitsSection);
+    await settle(fixture);
+    const el = fixture.nativeElement as HTMLElement;
+    const freq = el.querySelector('[aria-label="New habit frequency"]') as HTMLSelectElement;
+    freq.value = 'interval';
+    freq.dispatchEvent(new Event('change'));
+    await settle(fixture);
+    (el.querySelector('[aria-label="New habit every N days"]') as HTMLInputElement).value = '45';
+    freq.value = 'daily';
+    freq.dispatchEvent(new Event('change'));
+    (el.querySelector('[aria-label="New habit name"]') as HTMLInputElement).value = 'Supplements';
+    await settle(fixture);
+    (el.querySelector('form button[type=submit]') as HTMLButtonElement).click();
+    await settle(fixture);
+    expect(addHabit).toHaveBeenCalledWith(expect.objectContaining({ name: 'Supplements', frequency: 'daily', intervalDays: null }));
+  });
 });

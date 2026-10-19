@@ -67,7 +67,7 @@ const SLOT_LABEL: Record<Slot, string> = { morning: 'morning', night: 'night', a
           }
         </div>
       }
-      <form class="mt-2 grid gap-1.5 border-t border-line pt-2" (submit)="add($event, nName, nEmoji, nFreq, nSlot, nDay, nEvery)">
+      <form class="mt-2 grid gap-1.5 border-t border-line pt-2" novalidate (submit)="add($event, nName, nEmoji, nFreq, nSlot, nDay, nEvery)">
         <div class="flex gap-1.5">
           <input #nEmoji class="field !w-14 shrink-0 text-center" placeholder="✅" maxlength="8" aria-label="New habit emoji" />
           <input #nName class="field min-w-0 flex-1" placeholder="+ Add habit" maxlength="40" aria-label="New habit name" />
