@@ -28,6 +28,8 @@ test('a countdown with a challenge, then its report card on the day', async ({ p
   await row.getByRole('button', { name: /Test day/ }).click();
   await row.getByLabel('Date', { exact: true }).fill(tomorrow());
   await row.getByRole('button', { name: 'Save' }).click();
+  // The form closes once the save lands; reloading earlier would cancel it.
+  await expect(row.getByRole('button', { name: 'Save' })).toBeHidden();
 
   await pinClock(page, tomorrow(), '12:00');
   await page.goto('/today');

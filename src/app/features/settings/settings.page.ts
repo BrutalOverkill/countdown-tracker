@@ -13,7 +13,7 @@ import { TargetsSection } from './targets-section';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h1 class="mb-3 px-1 text-2xl font-extrabold">Settings</h1>
-    <div class="grid gap-2 lg:grid-cols-2">
+    <div class="grid grid-cols-1 gap-2 lg:grid-cols-2">
       <app-countdowns-section />
       <app-habits-section />
       <app-targets-section />
