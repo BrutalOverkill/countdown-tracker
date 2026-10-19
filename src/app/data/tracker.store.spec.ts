@@ -107,6 +107,17 @@ describe('TrackerStore', () => {
     expect(toast.message()).toBe("Couldn't save — check your connection");
   });
 
+  it('reloads on the next return after markStale, even within a minute of the last load', async () => {
+    const loadConfig = vi.fn().mockResolvedValue(config);
+    const { store } = setup({ ensureSetup: vi.fn().mockResolvedValue(undefined), loadConfig, loadHistory: vi.fn().mockResolvedValue(emptyRows) });
+    await store.load('user-a');
+    await store.refreshIfStale();
+    expect(loadConfig).toHaveBeenCalledTimes(1);
+    store.markStale();
+    await store.refreshIfStale();
+    expect(loadConfig).toHaveBeenCalledTimes(2);
+  });
+
   it('shows what the server has after two quick taps that both fail', async () => {
     const { store } = setup({ setCheck: vi.fn().mockRejectedValue(new Error('down')) });
     await Promise.all([store.toggleCheck('h1', '2026-10-19'), store.toggleCheck('h1', '2026-10-19')]);

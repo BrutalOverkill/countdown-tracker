@@ -28,7 +28,7 @@ import { WorkoutCard } from './workout-card';
       </div>
       <div class="flex shrink-0 items-center gap-2">
         @if (isIos) {
-          <a href="shortcuts://run-shortcut?name=Countdown%20Sync" class="btn-quiet press !px-3 !py-2 text-xs">↻ Sync</a>
+          <a href="shortcuts://run-shortcut?name=Countdown%20Sync" class="btn-quiet press !px-3 !py-2 text-xs" (click)="store.markStale()">↻ Sync</a>
         }
         <button type="button" aria-label="Switch theme" (click)="theme.toggle()"
           class="press grid size-10 place-items-center rounded-full bg-accent text-lg text-black

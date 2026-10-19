@@ -105,6 +105,11 @@ export class TrackerStore {
     if (this.loaded() && Date.now() - this.lastLoad > 60_000) await this.reload().catch(() => undefined);
   }
 
+  /** ↻ Sync hands off to the Shortcut; the next return to the app should pick up what it sent. */
+  markStale(): void {
+    this.lastLoad = 0;
+  }
+
   async ensureHistoryFrom(from: Day): Promise<void> {
     if (this.loadedFrom !== null && from >= this.loadedFrom) return;
     const gen = this.generation;
