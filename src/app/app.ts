@@ -1,15 +1,14 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
+import { ThemeService } from './core/theme.service';
 
 @Component({
   selector: 'app-root',
+  imports: [RouterOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <main class="grid min-h-dvh place-items-center text-center">
-      <div>
-        <h1 class="text-3xl font-black">Countdown</h1>
-        <p class="muted">Setting up…</p>
-      </div>
-    </main>
-  `,
+  template: `<router-outlet />`,
 })
-export class App {}
+export class App {
+  // Created at startup so the theme is applied on the login screen too.
+  private readonly theme = inject(ThemeService);
+}
