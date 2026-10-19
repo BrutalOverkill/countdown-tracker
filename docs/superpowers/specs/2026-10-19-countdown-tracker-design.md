@@ -30,14 +30,15 @@ A personal tracker for Anvit, used on the iPhone (installed to the home screen) 
 | Habit view | Planner-style **wheel** + **grid**, with a toggle | chose (mockups) |
 | Stack | Angular + Tailwind, Supabase (DB + login + one function), GitHub Pages | chose (Q6) |
 | Repo | Public, personal GitHub account `BrutalOverkill`, app name **Countdown** | chose (Q7) |
+| Game layer | Daily score + Perfect Days + streak with a weekly freeze; countdown challenges + report card | chose (Q8, mockups) |
 | Timezone | All "days" are India time (`Asia/Kolkata`) | assumed, confirmed |
 | Calories "on target" | At least one food logged that day **and** total ≤ target | assumed, confirmed |
 
 ## 3. Scope
 
-**In v1:** the four screens below, the sync function, the iPhone Shortcut (with written setup steps), login, auto-deploy, installable PWA.
+**In v1:** the four screens below, the game layer (§4.6), the sync function, the iPhone Shortcut (with written setup steps), login, auto-deploy, installable PWA.
 
-**Not in v1** (can be added later): food database search, set/rep detail from Strong, per-routine timed push notifications, offline editing, charts beyond wheel/grid/streaks, multiple users.
+**Not in v1** (can be added later): food database search, set/rep detail from Strong, per-routine timed push notifications, offline editing, charts beyond wheel/grid/streaks, multiple users, XP/levels/self-set rewards, badges.
 
 ## 4. Screens
 
@@ -49,10 +50,22 @@ Theme tokens (dark only): background `#000`, card `#1C1C1E`, raised `#2C2C2E`, t
 
 ### 4.1 Today
 - Header: date (e.g. `MON 19 OCT`) and a **↻ Sync iPhone** button. The button opens `shortcuts://run-shortcut?name=Countdown%20Sync`; it is shown only on iOS.
+- **Score card** (first card): a ring showing today's score out of 100, labelled `LIVE`. Beside it:
+  - "N of M done · K to go for a ⭐ Perfect Day" — or "⭐ Perfect Day!" once it's 100
+  - a 🔥 streak chip ("12-day streak")
+  - a ❄️ chip when this week's freeze is still unused
+
+  Rules: §8.1.
 - **Countdown card:** one tile per upcoming countdown, sorted by date: big number of days + emoji + title.
   - Days = `target_date − today` (IST calendar days).
-  - On the day itself the tile reads **"Today! {emoji}"** (e.g. "Today! 🪔 Diwali").
+  - On the day itself the tile reads **"Today! {emoji}"** (e.g. "Today! 🪔 Diwali"), with a **"See your report card →"** button (§4.6).
   - Once the date has passed it disappears from Today (still listed under "Past" in Settings).
+- **Challenge cards:** one card per upcoming countdown that has challenges, titled "{emoji} {title}". Each challenge row shows:
+  - the habit name and "done / target days"
+  - a status chip: ON TRACK (lime), BEHIND (pink), WON 🏆 (yellow) or OUT OF REACH (grey)
+  - a progress bar with a white pace marker at `target × elapsed ÷ window`
+
+  The card's footer reads "N days left", or "Need X of the next N days" when a row is BEHIND. Rules: §8.2.
 - **Rings card:** three concentric rings with figures beside them.
   - Steps: today's count / step goal. Below: "Steps synced {time}". This label turns amber if the last sync was more than 24 h ago.
   - Calories: today's total / calorie goal.
@@ -63,8 +76,8 @@ Theme tokens (dark only): background `#000`, card `#1C1C1E`, raised `#2C2C2E`, t
 
 ### 4.2 Habits
 - Header: month switcher `‹ Oct 2026 ›` (back to the first month with data, forward to the current month) and a **Wheel | Grid** toggle. The last choice is remembered on the device.
-- **Wheel:** a 270° spiral from 12 o'clock clockwise. One ring per daily habit (outermost = first in sort order), one spoke per day of the month, day numbers in an outer band, and habit names on lines in the empty quadrant (as in the paper planner). A filled dot means done. Today's spoke is highlighted. Auto habits are marked ⚡.
-- **Grid:** rows = daily habits, columns = days 1–31; same dots and highlight. Tapping a dot for a **manual** habit on a past day or today toggles it (to fix a forgotten tick); future days and auto habits aren't tappable. Below the grid: per-habit "done X / elapsed days · best streak N".
+- **Wheel:** a 270° spiral from 12 o'clock clockwise. One ring per daily habit (outermost = first in sort order), one spoke per day of the month, day numbers in an outer band, and habit names on lines in the empty quadrant (as in the paper planner). A filled dot means done. Today's spoke is highlighted. Auto habits are marked ⚡. A **gold ⭐** sits in the day band on every past Perfect Day.
+- **Grid:** rows = daily habits, columns = days 1–31; same dots and highlight. Tapping a dot for a **manual** habit on a past day or today toggles it (to fix a forgotten tick); future days and auto habits aren't tappable. The day header shows ⭐ over past Perfect Days and ❄️ over days saved by a streak freeze. Below the grid: per-habit "done X / elapsed days · best streak N".
 - **Weekly** card: rows = weekly habits, columns W1–W5, filled if done in that week.
 - **Monthly one-offs** card: a checklist of tasks for the shown month, with "+ add", tick, and swipe-to-delete.
 - Habits shown for a month: those created on or before the month's last day and not archived before its first day.
@@ -77,6 +90,8 @@ Theme tokens (dark only): background `#000`, card `#1C1C1E`, raised `#2C2C2E`, t
 
 ### 4.4 Settings
 - **Countdowns:** list (upcoming, then "Past"), add / edit (title, emoji, date) / delete.
+  - The edit sheet holds the countdown's **challenges** (up to 3): pick a daily habit and a target "on X of the N days left". X defaults to `ceil(0.75 × N)` and can be 1–N. Challenges can be deleted, not edited (so a target can't be lowered after a bad week).
+  - Tapping a **past** countdown opens its report card.
 - **Habits:** list in sort order, drag to reorder; add / edit:
   - name, emoji, colour (defaults to the next rainbow colour)
   - frequency: daily / weekly
@@ -91,7 +106,26 @@ Theme tokens (dark only): background `#000`, card `#1C1C1E`, raised `#2C2C2E`, t
   - link to the setup steps
 - **Account:** signed-in email, Sign out.
 
-### 4.5 Login
+### 4.6 Game layer: Perfect Day moment and report card
+
+![Game layer](assets/game-layer.png)
+
+- **Perfect Day moment:** when today's score reaches 100 while the app is open (usually right after the last tick), a full-screen overlay appears. It has confetti, "⭐ PERFECT DAY", "All M rings closed · 100/100", the 🔥 streak, "Perfect Day #N this month" and a **Nice 🙌** button that closes it. It shows **at most once per day** — the date it was shown is kept in `localStorage` on that device.
+- **Report card** (route `/report/:countdownId`), opened from the countdown tile on the day or from Settings → Past. Period = from the countdown's `created_at` date (IST) to the day before `target_date`. Contents:
+  - header "{date} · {title} {emoji}", "{title} report card", period and length in days
+  - the grade letter (§8.3), "Average score N" and "Best week: {range} (avg N)" — best = the highest-average run of 7 consecutive days inside the period (skipped if the period is shorter than 7 days)
+  - a 3 × 2 stat grid:
+    - ⭐ Perfect Days
+    - 🔥 best streak
+    - 💪 workout days
+    - total steps (`196k` style)
+    - average steps per day
+    - days on calorie target
+  - the challenges with final results (WON 🏆 / missed)
+  - per-habit completion % bars for the manual daily habits
+  - If the period has no days yet (countdown created on its own date), the card shows "Nothing to report — this countdown started today".
+
+### 4.7 Login
 Email + password screen, shown when there's no session. **New sign-ups are disabled** in Supabase after Anvit's account is created. (Magic links aren't used: on iOS they open in Safari, not in the home-screen app, so the login wouldn't carry over.)
 
 ## 5. Architecture
@@ -118,6 +152,7 @@ Every table has `user_id uuid not null default auth.uid() references auth.users`
 | `habits` | `id uuid`, `name text`, `emoji text`, `color text`, `frequency text check in ('daily','weekly')`, `source text check in ('manual','steps','calories','workout')`, `slot text check in ('morning','night','anytime')`, `weekday smallint null` (0 = Sun, weekly only), `sort_order int`, `archived_at timestamptz null`, `created_at` | Seeded: 10k steps, Calories on target, Workout (auto); AM skincare, PM skincare, Minoxidil AM, Minoxidil PM (daily manual); Dermarolling (weekly manual, preferred day Sunday — editable) |
 | `habit_checks` | `id uuid`, `habit_id uuid → habits`, `day date`, `created_at` | unique (`habit_id`, `day`); only for `source = 'manual'` |
 | `tasks` | `id uuid`, `title text`, `month date` (first of month), `done_at timestamptz null`, `created_at` | monthly one-offs |
+| `challenges` | `id uuid`, `countdown_id uuid → countdowns on delete cascade`, `habit_id uuid → habits`, `target_days int check > 0`, `start_day date`, `created_at` | max 3 per countdown (enforced in the app); window = `start_day` … `target_date − 1` |
 | `steps_daily` | `day date`, `count int check 0..100000`, `synced_at timestamptz` | PK (`user_id`, `day`) |
 | `workouts` | `id uuid`, `started_at timestamptz`, `day date`, `duration_min int null`, `name text null`, `source text check in ('health','manual')` | unique (`user_id`, `started_at`) |
 | `saved_foods` | `id uuid`, `name text`, `kcal int`, `protein_g numeric null`, `use_count int default 0` | |
@@ -169,7 +204,46 @@ Behaviour:
 - **Manual habit done** on a day ⇔ a `habit_checks` row for that habit and day.
 - Goal changes re-score all past days (accepted trade-off of not storing results).
 - **Weeks (W1–W5)** are planner-style blocks of the month: W1 = days 1–7, W2 = 8–14, W3 = 15–21, W4 = 22–28, W5 = 29–end. A weekly habit is done in a week if it has any check on a day in that block. "This week" on Today and in the sync nudge uses the same blocks.
-- **Streak** = consecutive done days ending today (if done) or yesterday. **Best streak** = longest run within the shown month.
+- **Habit streak** (grid stats) = consecutive done days of one habit ending today (if done) or yesterday. **Best streak** = longest run within the shown month. No freezes here.
+
+### 8.1 Daily score, Perfect Day, streak
+
+- **Daily habits of a day** = habits with `frequency = 'daily'` that are active that day (created on/before it, not archived on/before it). Weekly habits are not part of the score.
+- **Done for scoring** = the done rules above, with one exception. For **today only**, the calories habit counts as done while *on track*: at least one entry and total ≤ goal.
+- **Score** = `round(100 × done ÷ count)`; 0 if `count = 0`.
+- **Perfect Day** = score 100. A past day's ⭐ uses the final rules, so a day that looked perfect at 8 PM but went over on calories doesn't keep its star.
+- **Good day** = score ≥ 80.
+- **Overall streak** (🔥 on Today), counted backwards from yesterday:
+  - each good day adds 1
+  - a day that isn't good is **frozen** (❄️) if no other day in the same Monday–Sunday week has been frozen. It neither adds to nor breaks the streak.
+  - any other day that isn't good ends the count
+  - days before the first-ever habit day end the count too
+
+  Today then adds 1 if it is already a good day. Freezes are worked out on the fly every time, oldest day first within each week; nothing is stored.
+- **Freeze available** (❄️ chip on Today) = no day of the current Monday–Sunday week has been frozen.
+
+### 8.2 Challenges
+
+For a challenge with window `start_day … end_day` (`end_day = target_date − 1`), `window = end_day − start_day + 1`:
+
+- `done` = days in the window (up to today) where the challenge's habit is done (final rules; today counts with the live rule).
+- `elapsed` = days from `start_day` through yesterday, clamped to 0…window.
+- `left` = days from today through `end_day`, clamped to 0…window.
+- Status, checked in this order:
+  1. **WON** if `done ≥ target_days`. Missed days never subtract, so it stays won (only un-ticking a past day could undo it).
+  2. **OUT OF REACH** if `done + left < target_days`.
+  3. **ON TRACK** if `done ≥ target_days × elapsed ÷ window`.
+  4. Otherwise **BEHIND**.
+- The pace marker sits at `elapsed ÷ window` of the bar. "Need X of the next N days": `X = target_days − done`, `N = left`.
+- After `end_day`, a challenge that isn't WON is **missed** (shown only on the report card).
+
+### 8.3 Report card
+
+- **Average score** = mean of the daily scores over the period (final rules); rounded.
+- **Grade:** A+ ≥ 90, A ≥ 80, B ≥ 70, C ≥ 60, D < 60.
+- **Best streak** = longest run of good days within the period, freezes applied as in §8.1.
+- **Workout days** = days in the period with a workout. **Calorie target days** = days the calories habit was done.
+- **Habit %** = done days ÷ active days in the period, per manual daily habit.
 
 ## 9. iPhone Shortcut
 
@@ -217,7 +291,11 @@ If Workouts can't be read, the Shortcut sends steps only, and the workout card r
 - **Unit tests** (Angular's default test runner):
   - countdown day maths, including just before and after midnight IST
   - auto-habit scoring
-  - streaks
+  - daily score, Perfect Day (including the today-only calories rule)
+  - overall streak with freezes (two misses in one week, a miss on Sunday then Monday, no history)
+  - challenge status (each of the four, WON locking, window edges)
+  - report card numbers and grade boundaries
+  - habit streaks
   - week blocks
   - month habit visibility
   - calorie totals
