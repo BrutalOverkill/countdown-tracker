@@ -14,7 +14,15 @@
 
 - Angular 22.2 / CLI 22.2.3, standalone components, signals, **zoneless** (no zone.js), `ChangeDetectionStrategy.OnPush` on every component, inline templates.
 - TypeScript 6: no `baseUrl` in tsconfig (deprecated → build error); path alias `@shared/*` → `./supabase/functions/_shared/*`.
-- Tailwind CSS 4 via `@tailwindcss/postcss`; tokens in `src/styles.css` `@theme`. Dark only: bg `#000`, card `#1C1C1E`, raised `#2C2C2E`, line `#3A3A3C`, muted `#8E8E93`, steps `#A3F53B`, kcal `#FF375F`, routine `#32D7FA`, countdown `#FFD60A`, weekly `#BF5AF2`, streak `#FF9F0A`.
+- Tailwind CSS 4 via `@tailwindcss/postcss`. **Two themes** (spec §4.0):
+  - `data-theme="bento" | "matrix"` on `<html>`
+  - tokens in `src/styles.css` `@theme`, with Matrix overrides in `[data-theme='matrix']`
+  - shared classes: `.tile[data-tone]`, `.card`, `.num`, `.label`, `.muted`, `.field`, `.btn`, `.btn-quiet`, `.pill`, `.chip`, `.tab`, `.press`, `.pop`, `.flicker`
+  - `matrix:` / `bento:` variants
+
+  Never hard-code a theme colour in a template when a token exists. SVG colours that depend on the theme come from `ThemeService`.
+- Fonts bundled via Fontsource (Space Grotesk Variable, Space Mono 400/700, Doto Variable) — no runtime Google Fonts.
+- Motion respects `prefers-reduced-motion`; component tests run with it on (`src/test-setup.ts`).
 - A "day" is a `YYYY-MM-DD` string. The **app day** of an instant is the IST calendar date of (instant − 4 h) — `appDayOf()`; food entries, workouts, ticks, "today" and countdowns use app days. Only `steps_daily.day` uses Apple Health's calendar days. All day/time maths uses `supabase/functions/_shared/days.ts` and `windows.ts` (`@shared/days`, `@shared/windows` in the app) — never the device timezone, never `new Date().getDate()`.
 - Eating windows are `{ start: 'HH:MM', end: 'HH:MM' }` IST clock times, end exclusive, judged on the clock (not the app day). Defaults `00:00–01:00` and `11:00–13:00`.
 - Supabase: project region Mumbai; tables, columns and checks exactly as spec §6; RLS owner-only on every table; new sign-ups disabled.
@@ -73,18 +81,20 @@ countdown-tracker/
     app/
       app.ts, app.config.ts, app.routes.ts
       core/   config.ts supabase.ts auth.service.ts auth.guard.ts clock.ts online.ts toast.service.ts format.ts storage.ts
+              motion.ts theme.ts theme.service.ts
       domain/ types.ts testing.ts visibility.ts scoring.ts streaks.ts challenges.ts report.ts palette.ts
       data/   rows.ts history.ts select-all.ts tracker-api.ts tracker.store.ts
+      ui/     ring.ts meter.ts count-up.ts          theme-aware primitives (arc/bar in Bento, dots in Matrix)
       features/
         shell/    shell.ts tab-bar.ts toast.ts perfect-day.ts
         login/    login.page.ts
-        today/    today.page.ts today.vm.ts score-card.ts countdowns-card.ts fasting-card.ts rings-card.ts
-                  workout-card.ts routines-card.ts challenges-card.ts
+        today/    today.page.ts today.vm.ts score-card.ts countdowns-card.ts fasting-card.ts steps-tile.ts
+                  calories-tile.ts workout-card.ts routines-card.ts challenges-card.ts
         habits/   habits.page.ts month-matrix.ts wheel-geometry.ts habit-wheel.ts habit-grid.ts
                   weekly-card.ts tasks-card.ts
         food/     food.page.ts food-day.ts
         settings/ settings.page.ts settings-forms.ts countdowns-section.ts habits-section.ts targets-section.ts
-                  fasting-section.ts shortcut-section.ts
+                  fasting-section.ts shortcut-section.ts appearance-section.ts
         report/   report.page.ts report-view.ts
 ```
 
@@ -103,7 +113,19 @@ Each milestone ends in a checkpoint. **Don't start the next milestone until its 
 | M3 Backend | 6–7 | `setup-check` passes; both functions deployed and returning the 401 JSON for a bad token |
 | M4 App core + data | 8–9 | Sign in/out with the test user; data loads; sign-out clears it; a failed load shows Retry |
 | M5 Screens | 10–14 | Every screen's component tests pass and its browser check is done on real data |
-| M6 Proof | 15–16 | `test:live` passes (setup, security, live functions, 20 Playwright tests); CI green; the iPhone checklist is handed over |
+| M6 Proof | 15–16 | `test:live` passes (setup, security, live functions, 24 Playwright tests); CI green; the iPhone checklist is handed over |
+
+## Theme changes (2026-10-19)
+
+Anvit picked two looks, **Bento** and **Matrix**, Auto-switching by time of day with a ◐ override (spec §4.0, §4.0.1). Where that lands:
+- **Task 1:** fonts bundled, the themed `styles.css`, the pre-boot theme script, and the Reduce-Motion test setup.
+- **Task 8:** theme rules and `ThemeService`; the floating tab bar; view transitions.
+- **Task 10:** the bento-grid Today screen, with `app-ring` / `app-meter` / `app-count` that draw arcs and bars in Bento and dots in Matrix.
+- **Task 11:** a theme-aware wheel and grid.
+- **Task 13:** an Appearance setting.
+- **Task 14:** a themed report card.
+- **Task 15:** Playwright theme tests.
+- **Task 16:** iPhone theme checks.
 
 ## Review changes (2026-10-19)
 
@@ -143,12 +165,19 @@ If Workouts isn't readable, Task 16's Shortcut doc drops the workouts steps of t
 
 **Files:**
 - Create (generated): `angular.json`, `package.json`, `package-lock.json`, `tsconfig.json`, `tsconfig.app.json`, `tsconfig.spec.json`, `.postcssrc.json`, `.editorconfig`, `.prettierrc`, `.vscode/*`, `src/main.ts`, `src/app/app.config.ts`, `src/app/app.routes.ts`, `ngsw-config.json`, `public/manifest.webmanifest`, `public/icons/*`
-- Create: `vitest.functions.config.ts`, `scripts/icon.svg`, `scripts/make-icons.ps1`, `.github/workflows/deploy.yml`
-- Modify: `.gitignore`, `src/styles.css`, `src/index.html`, `src/app/app.ts`, `src/app/app.spec.ts`
+- Create: `vitest.functions.config.ts`, `src/test-setup.ts`, `scripts/icon.svg`, `scripts/make-icons.ps1`, `.github/workflows/deploy.yml`
+- Modify: `.gitignore`, `angular.json` (styles + test setup), `tsconfig.spec.json`, `src/styles.css`, `src/index.html`, `src/app/app.ts`, `src/app/app.spec.ts`
 - Delete: `src/app/app.html`, `src/app/app.css`, `public/favicon.ico`
 
 **Interfaces:**
-- Produces: npm scripts `test:functions`; path alias `@shared/*`; CSS component classes `.card .label .muted .field .btn .btn-quiet`; Tailwind colour utilities `bg-card bg-raised border-line text-muted text-steps text-kcal text-routine text-count text-weekly text-streak` (and `bg-*` of the same).
+- Produces:
+  - npm scripts `test:functions`
+  - path alias `@shared/*`
+  - `src/test-setup.ts` (Reduce Motion on in component tests)
+  - CSS classes `.tile[data-tone=pink|lime|blue|violet|orange] .card .num .label .muted .field .btn .btn-quiet .pill .chip[data-status] .tab(.is-active) .press .pop .flicker .ring-arc .meter-fill`
+  - variants `matrix:` / `bento:`
+  - colour utilities `bg-card bg-raised bg-accent border-line text-muted text-accent text-steps text-kcal text-routine text-count text-weekly text-streak` (and `bg-*` of the same)
+  - the pre-boot theme script in `index.html` (reads `localStorage['theme-last']`)
 
 - [ ] **Step 1: Generate the workspace beside the repo and move it in**
 
@@ -165,15 +194,57 @@ npm install
 
 Expected: `added N packages`; `angular.json` has project `countdown-tracker`; `package.json` lists `tailwindcss`, `@tailwindcss/postcss`, `vitest`; no `zone.js`.
 
-- [ ] **Step 2: Add the service worker and Supabase client**
+- [ ] **Step 2: Add the service worker, Supabase client and bundled fonts**
 
 ```bash
 npx ng add @angular/pwa --skip-confirmation
-npm install @supabase/supabase-js@2.118.0
+npm install @supabase/supabase-js@2.118.0 @fontsource-variable/space-grotesk@5.3.0 @fontsource/space-mono@5.3.0 @fontsource-variable/doto@5.3.0
 rm public/favicon.ico src/app/app.html src/app/app.css
 ```
 
 Expected: `ngsw-config.json`, `public/manifest.webmanifest`, `public/icons/icon-*.png` created; `src/app/app.config.ts` now calls `provideServiceWorker('ngsw-worker.js', …)`.
+
+In `angular.json`, set the build `"styles"` array so the fonts are bundled (the build copies the `.woff2` files into `media/`, which the service worker's asset group already caches):
+
+```json
+            "styles": [
+              "node_modules/@fontsource-variable/space-grotesk/index.css",
+              "node_modules/@fontsource/space-mono/400.css",
+              "node_modules/@fontsource/space-mono/700.css",
+              "node_modules/@fontsource-variable/doto/index.css",
+              "src/styles.css"
+            ]
+```
+
+In the same file, give the `test` target a setup file:
+
+```json
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": { "setupFiles": ["src/test-setup.ts"] }
+        }
+```
+
+Create `src/test-setup.ts`:
+
+```ts
+// Component tests run as if iOS "Reduce Motion" were on, so count-ups and transitions settle instantly.
+Object.defineProperty(window, 'matchMedia', {
+  configurable: true,
+  value: (query: string) => ({
+    matches: query.includes('prefers-reduced-motion: reduce'),
+    media: query,
+    onchange: null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+  }),
+});
+```
+
+and add `"src/test-setup.ts"` to the `"include"` array of `tsconfig.spec.json`.
 
 - [ ] **Step 3: Add the shared-code alias and the functions test runner**
 
@@ -200,31 +271,59 @@ In `package.json` `"scripts"`, add:
     "test:functions": "vitest run --config vitest.functions.config.ts --passWithNoTests",
 ```
 
-- [ ] **Step 4: Theme tokens and shared component classes**
+- [ ] **Step 4: The two themes — tokens, shared classes and motion**
+
+Everything visual hangs off `data-theme="bento" | "matrix"` on `<html>` (spec §4.0). Tailwind colour utilities (`bg-card`, `text-steps`, …) read CSS variables that the Matrix theme redefines, so most templates need no per-theme code. Where they do, use the `matrix:` / `bento:` variants defined here.
 
 Replace `src/styles.css` with:
 
 ```css
 @import 'tailwindcss';
 
+@custom-variant matrix (&:where([data-theme='matrix'], [data-theme='matrix'] *));
+@custom-variant bento (&:where([data-theme='bento'], [data-theme='bento'] *));
+
+/* Bento values; [data-theme='matrix'] below redefines them. */
 @theme {
-  --font-sans: -apple-system, 'SF Pro Text', 'Segoe UI', Roboto, system-ui, sans-serif;
+  --font-sans: 'Space Grotesk Variable', -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'Space Mono', ui-monospace, monospace;
+  --font-dot: 'Doto Variable', 'Space Mono', monospace;
   --color-bg: #000000;
-  --color-card: #1c1c1e;
-  --color-raised: #2c2c2e;
-  --color-line: #3a3a3c;
+  --color-card: #161616;
+  --color-raised: #262626;
+  --color-line: #2a2a2a;
   --color-muted: #8e8e93;
-  --color-steps: #a3f53b;
-  --color-kcal: #ff375f;
-  --color-routine: #32d7fa;
+  --color-accent: #c8ff00;
+  --color-steps: #c8ff00;
+  --color-kcal: #ff3d8b;
+  --color-routine: #3d7bff;
   --color-count: #ffd60a;
-  --color-weekly: #bf5af2;
-  --color-streak: #ff9f0a;
+  --color-weekly: #8b5cf6;
+  --color-streak: #ff7a1a;
+  --color-tone-pink: #ff3d8b;
+  --color-tone-lime: #c8ff00;
+  --color-tone-blue: #3d7bff;
+  --color-tone-violet: #8b5cf6;
+  --color-tone-orange: #ff7a1a;
+}
+
+[data-theme='matrix'] {
+  --font-sans: 'Space Mono', ui-monospace, monospace;
+  --color-card: #000000;
+  --color-raised: #111111;
+  --color-muted: #8a8a8a;
+  --color-accent: #ff3b30;
+  --color-steps: #f2f2f2;
+  --color-kcal: #ff3b30;
+  --color-routine: #f2f2f2;
+  --color-count: #ff3b30;
+  --color-weekly: #f2f2f2;
+  --color-streak: #ff3b30;
 }
 
 html {
   background: var(--color-bg);
-  color: #fff;
+  color: #f2f2f2;
   color-scheme: dark;
 }
 
@@ -237,22 +336,97 @@ body {
 }
 
 @layer components {
-  .card { @apply rounded-2xl bg-card p-3; }
-  .label { @apply text-[10px] font-bold uppercase tracking-wider; }
-  .muted { @apply text-xs text-muted; }
-  .field { @apply w-full rounded-lg bg-raised px-3 py-2 text-sm text-white outline-none placeholder:text-muted focus:ring-2 focus:ring-routine; }
-  .btn { @apply rounded-lg bg-steps px-3 py-2 text-sm font-extrabold text-black disabled:opacity-40; }
-  .btn-quiet { @apply rounded-lg bg-raised px-3 py-2 text-sm font-semibold text-white disabled:opacity-40; }
+  /* A tile is the building block of every screen; data-tone picks a Bento colour block. */
+  .tile, .card { position: relative; overflow: hidden; border-radius: 22px; background: var(--color-card); padding: 0.85rem; color: #fff; }
+  .tile[data-tone] { color: #000; }
+  .tile[data-tone='pink'] { background: var(--color-tone-pink); }
+  .tile[data-tone='lime'] { background: var(--color-tone-lime); }
+  .tile[data-tone='blue'] { background: var(--color-tone-blue); }
+  .tile[data-tone='violet'] { background: var(--color-tone-violet); }
+  .tile[data-tone='orange'] { background: var(--color-tone-orange); }
+  [data-theme='matrix'] .tile, [data-theme='matrix'] .card { border-radius: 18px; border: 1px solid var(--color-line); background: #000; color: #f2f2f2; }
+
+  .num { font-weight: 700; letter-spacing: -0.04em; line-height: 0.9; font-variant-numeric: tabular-nums; }
+  [data-theme='matrix'] .num { font-family: var(--font-dot); font-weight: 900; letter-spacing: 0.02em; }
+
+  .label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+  .tile[data-tone] .label { opacity: 0.75; }
+  [data-theme='matrix'] .label { font-family: var(--font-mono); font-weight: 400; letter-spacing: 0.14em; color: var(--color-muted); opacity: 1; }
+
+  .muted { font-size: 12px; color: var(--color-muted); }
+  .tile[data-tone] .muted { color: rgb(0 0 0 / 0.65); }
+  [data-theme='matrix'] .tile .muted { color: var(--color-muted); }
+
+  .field { width: 100%; border-radius: 14px; background: var(--color-raised); padding: 0.55rem 0.8rem; font-size: 0.875rem; color: #fff; outline: none; }
+  .field::placeholder { color: var(--color-muted); }
+  .field:focus { box-shadow: 0 0 0 2px var(--color-accent); }
+  [data-theme='matrix'] .field { border-radius: 10px; border: 1px solid var(--color-line); background: #000; font-family: var(--font-mono); }
+
+  .btn { border-radius: 999px; background: var(--color-accent); padding: 0.55rem 1rem; font-size: 0.875rem; font-weight: 800; color: #000; }
+  .btn-quiet { border-radius: 999px; background: var(--color-raised); padding: 0.55rem 1rem; font-size: 0.875rem; font-weight: 600; color: #fff; }
+  .btn:disabled, .btn-quiet:disabled { opacity: 0.4; }
+  [data-theme='matrix'] .btn { border-radius: 10px; background: #f2f2f2; text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.75rem; }
+  [data-theme='matrix'] .btn-quiet { border-radius: 10px; border: 1px solid var(--color-line); background: #000; text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.75rem; }
+
+  /* Routine ticks: lime pills in Bento, ● / ○ in Matrix. */
+  .pill { display: inline-flex; align-items: center; gap: 0.3rem; border-radius: 999px; background: var(--color-raised); padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 700; color: #bbb; }
+  .pill::before { content: '○'; }
+  .pill[aria-checked='true'] { background: var(--color-accent); color: #000; }
+  .pill[aria-checked='true']::before { content: '✓'; }
+  [data-theme='matrix'] .pill { background: transparent; padding: 0.15rem 0; font-weight: 400; color: var(--color-muted); }
+  [data-theme='matrix'] .pill::before { color: #555; }
+  [data-theme='matrix'] .pill[aria-checked='true'] { background: transparent; color: #f2f2f2; }
+  [data-theme='matrix'] .pill[aria-checked='true']::before { content: '●'; color: var(--color-accent); }
+
+  .chip { border-radius: 6px; background: var(--color-raised); padding: 1px 6px; font-size: 9px; font-weight: 800; color: var(--color-muted); }
+  .chip[data-status='on_track'] { color: var(--color-steps); }
+  .chip[data-status='behind'] { color: var(--color-kcal); }
+  .chip[data-status='won'] { color: var(--color-count); }
+
+  .tab.is-active { background: var(--color-accent); color: #000; font-weight: 700; }
+  [data-theme='matrix'] .tab { text-transform: uppercase; letter-spacing: 0.12em; font-size: 10px; }
+  [data-theme='matrix'] .tab.is-active { background: transparent; color: #f2f2f2; }
+  [data-theme='matrix'] .tab.is-active::before { content: '●'; color: var(--color-accent); }
+
+  /* Motion (spec §4.0.1). */
+  .press { transition: transform 0.15s cubic-bezier(0.3, 1.6, 0.5, 1); }
+  .press:active { transform: scale(0.97); }
+  .pop { animation: pop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1); }
+  .flicker { display: inline-block; transform-origin: 50% 90%; animation: flicker 2.4s ease-in-out infinite; }
+  .ring-arc, .meter-fill { transition: stroke-dasharray 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.15), width 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.15); }
+}
+
+@keyframes pop {
+  40% { transform: scale(1.12); }
+}
+
+@keyframes flicker {
+  30% { transform: scale(1.08) rotate(-4deg); }
+  60% { transform: scale(0.96) rotate(3deg); }
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.25s;
+}
+
+/* iOS "Reduce Motion" turns every animation and transition off. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 ```
 
-- [ ] **Step 5: iOS-ready `index.html`**
+- [ ] **Step 5: iOS-ready `index.html` that applies the theme before the app starts**
 
 Replace `src/index.html` with:
 
 ```html
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="bento">
 <head>
   <meta charset="utf-8">
   <title>Countdown</title>
@@ -266,6 +440,10 @@ Replace `src/index.html` with:
   <link rel="icon" type="image/png" href="icons/icon-96x96.png">
   <link rel="apple-touch-icon" href="icons/icon-180x180.png">
   <link rel="manifest" href="manifest.webmanifest">
+  <!-- Re-apply the last theme before first paint so the wrong one never flashes; ThemeService takes over at boot. -->
+  <script>
+    try { document.documentElement.dataset.theme = localStorage.getItem('theme-last') === 'matrix' ? 'matrix' : 'bento'; } catch (e) {}
+  </script>
 </head>
 <body>
   <app-root></app-root>
@@ -283,11 +461,11 @@ Create `scripts/icon.svg`:
   <rect width="512" height="512" fill="#000"/>
   <g fill="none" stroke-width="40" stroke-linecap="round" transform="rotate(-90 256 256)">
     <circle cx="256" cy="256" r="180" stroke="#2a3a1a"/>
-    <circle cx="256" cy="256" r="180" stroke="#a3f53b" stroke-dasharray="905 1131"/>
+    <circle cx="256" cy="256" r="180" stroke="#c8ff00" stroke-dasharray="905 1131"/>
     <circle cx="256" cy="256" r="126" stroke="#3a1a22"/>
-    <circle cx="256" cy="256" r="126" stroke="#ff375f" stroke-dasharray="594 792"/>
+    <circle cx="256" cy="256" r="126" stroke="#ff3d8b" stroke-dasharray="594 792"/>
     <circle cx="256" cy="256" r="72" stroke="#10303a"/>
-    <circle cx="256" cy="256" r="72" stroke="#32d7fa" stroke-dasharray="271 452"/>
+    <circle cx="256" cy="256" r="72" stroke="#3d7bff" stroke-dasharray="271 452"/>
   </g>
 </svg>
 ```
@@ -2672,7 +2850,8 @@ git commit -m "Add sync and food-guard Edge Functions" -m "Co-Authored-By: Claud
 **Files:**
 - Create: `src/app/core/supabase.ts`, `src/app/core/auth.service.ts`, `src/app/core/auth.guard.ts`
 - Create: `src/app/core/clock.ts`, `src/app/core/clock.spec.ts`, `src/app/core/online.ts`, `src/app/core/toast.service.ts`
-- Create: `src/app/core/format.ts`, `src/app/core/format.spec.ts`
+- Create: `src/app/core/format.ts`, `src/app/core/format.spec.ts`, `src/app/core/storage.ts`, `src/app/core/motion.ts`
+- Create: `src/app/core/theme.ts`, `src/app/core/theme.spec.ts`, `src/app/core/theme.service.ts`, `src/app/core/theme.service.spec.ts`
 - Create: `src/app/features/login/login.page.ts`, `src/app/features/login/login.page.spec.ts`
 - Create: `src/app/features/shell/shell.ts`, `src/app/features/shell/tab-bar.ts`, `src/app/features/shell/tab-bar.spec.ts`, `src/app/features/shell/toast.ts`
 - Create (stubs, replaced in Tasks 10–14): `src/app/features/today/today.page.ts`, `src/app/features/habits/habits.page.ts`, `src/app/features/food/food.page.ts`, `src/app/features/settings/settings.page.ts`, `src/app/features/report/report.page.ts`
@@ -2680,14 +2859,18 @@ git commit -m "Add sync and food-guard Edge Functions" -m "Co-Authored-By: Claud
 
 **Interfaces:**
 - Consumes: `config.ts` (Task 6); `@shared/days` (`appDayOf`, `istMinutesOf`, `weekdayOf`); `@shared/windows` (`formatClock`).
-- Produces: `SUPABASE: InjectionToken<SupabaseClient>`; `AuthService { session: Signal<Session|null>; email: Signal<string>; userId: Signal<string|null>; ready: Promise<void>; signIn(email, password): Promise<string|null>; signOut(): Promise<void> }`; `authGuard: CanActivateFn`; `Clock { today: Signal<Day>; minute: Signal<number>; instant: Signal<Date> }`; `Online { online: Signal<boolean> }`; `ToastService { message: Signal<string|null>; show(text): void }` plus constants `SAVE_FAILED`, `OFFLINE`; format helpers `formatNumber(n)`, `weekdayShort(day)` (`'Sun'`), `formatCompact(n)`, `formatDuration(min)`, `dayLabel(day)` (`'Mon 19 Oct'`), `dayLabelWithYear(day)`, `monthLabel(day)` (`'Oct 2026'`), `dayRange(from, to)` (`'19 Oct – 7 Nov'`), `timeOf(iso)` (`'6:00 PM'`), `hhmmOf(date)` (`'18:00'`); components `Shell`, `TabBar`, `Toast`, `LoginPage`; routes `/login`, `/today`, `/habits`, `/food`, `/settings`, `/report/:id`.
+- Produces: `SUPABASE: InjectionToken<SupabaseClient>`; `AuthService { session: Signal<Session|null>; email: Signal<string>; userId: Signal<string|null>; ready: Promise<void>; signIn(email, password): Promise<string|null>; signOut(): Promise<void> }`; `authGuard: CanActivateFn`; `Clock { today: Signal<Day>; minute: Signal<number>; instant: Signal<Date> }`; `Online { online: Signal<boolean> }`; `ToastService { message: Signal<string|null>; show(text): void }` plus constants `SAVE_FAILED`, `OFFLINE`; format helpers `formatNumber(n)`, `weekdayShort(day)` (`'Sun'`), `formatCompact(n)`, `formatDuration(min)`, `dayLabel(day)` (`'Mon 19 Oct'`), `dayLabelWithYear(day)`, `monthLabel(day)` (`'Oct 2026'`), `dayRange(from, to)` (`'19 Oct – 7 Nov'`), `timeOf(iso)` (`'6:00 PM'`), `hhmmOf(date)` (`'18:00'`), `greetingName(email)` (`'Anvit'`).
+- Produces (`storage.ts`): `storageGet(key)`, `storageSet(key, value)` (both swallow storage errors). `motion.ts`: `reducedMotion(): boolean`.
+- Produces (`theme.ts`): `type Theme = 'bento' | 'matrix'`, `type ThemePref = 'auto' | Theme`, `ThemeOverride { theme; until: string }`, `autoTheme(now)`, `nextSwitch(now): Date`, `effectiveTheme(pref, override, now)`, `parsePref(raw)`, `parseOverride(raw)`.
+- Produces (`ThemeService`, root): `pref: Signal<ThemePref>`, `theme: Signal<Theme>`, `setPref(p)`, `toggle()`. It keeps `<html data-theme>` and `localStorage['theme-last']` in sync, using a View Transition when allowed.
+- Produces (UI and routes): components `Shell`, `TabBar`, `Toast`, `LoginPage`; routes `/login`, `/today`, `/habits`, `/food`, `/settings`, `/report/:id` (router with view transitions).
 
 - [ ] **Step 1: Write the failing tests**
 
 Create `src/app/core/format.spec.ts`:
 
 ```ts
-import { dayLabel, dayLabelWithYear, dayRange, formatCompact, formatDuration, formatNumber, hhmmOf, monthLabel, timeOf, weekdayShort } from './format';
+import { dayLabel, dayLabelWithYear, dayRange, formatCompact, formatDuration, formatNumber, greetingName, hhmmOf, monthLabel, timeOf, weekdayShort } from './format';
 
 describe('format', () => {
   it('formats numbers the Indian way', () => {
@@ -2719,6 +2902,125 @@ describe('format', () => {
   it('shows IST clock times', () => {
     expect(timeOf('2026-10-19T12:30:00Z')).toBe('6:00 PM');
     expect(hhmmOf(new Date('2026-10-19T19:05:00Z'))).toBe('00:35');
+  });
+
+  it('greets by first name from the email', () => {
+    expect(greetingName('anvit.singh@octagos.com')).toBe('Anvit');
+    expect(greetingName('you+countdown-test@gmail.com')).toBe('You');
+    expect(greetingName('')).toBe('');
+  });
+});
+```
+
+Create `src/app/core/theme.spec.ts`:
+
+```ts
+import { autoTheme, effectiveTheme, nextSwitch, parseOverride, parsePref } from './theme';
+
+const ist = (day: string, hhmm: string) => new Date(`${day}T${hhmm}:00+05:30`);
+
+describe('theme rules', () => {
+  it('Auto is Bento from 06:00 to 18:59 IST and Matrix otherwise', () => {
+    expect(autoTheme(ist('2026-10-19', '05:59'))).toBe('matrix');
+    expect(autoTheme(ist('2026-10-19', '06:00'))).toBe('bento');
+    expect(autoTheme(ist('2026-10-19', '18:59'))).toBe('bento');
+    expect(autoTheme(ist('2026-10-19', '19:00'))).toBe('matrix');
+  });
+
+  it('finds the next switch-over', () => {
+    expect(nextSwitch(ist('2026-10-19', '14:00'))).toEqual(ist('2026-10-19', '19:00'));
+    expect(nextSwitch(ist('2026-10-19', '20:15'))).toEqual(ist('2026-10-20', '06:00'));
+    expect(nextSwitch(ist('2026-10-20', '03:00'))).toEqual(ist('2026-10-20', '06:00'));
+  });
+
+  it('lets a fixed preference win, and an override beat Auto until it expires', () => {
+    const at2pm = ist('2026-10-19', '14:00');
+    const until7pm = ist('2026-10-19', '19:00').toISOString();
+    expect(effectiveTheme('matrix', null, at2pm)).toBe('matrix');
+    expect(effectiveTheme('bento', { theme: 'matrix', until: until7pm }, at2pm)).toBe('bento');
+    expect(effectiveTheme('auto', { theme: 'matrix', until: until7pm }, at2pm)).toBe('matrix');
+    expect(effectiveTheme('auto', { theme: 'matrix', until: ist('2026-10-19', '13:00').toISOString() }, at2pm)).toBe('bento');
+  });
+
+  it('parses stored values defensively', () => {
+    expect(parsePref('matrix')).toBe('matrix');
+    expect(parsePref('nonsense')).toBe('auto');
+    expect(parsePref(null)).toBe('auto');
+    expect(parseOverride('{"theme":"matrix","until":"2026-10-19T13:30:00.000Z"}')).toEqual({ theme: 'matrix', until: '2026-10-19T13:30:00.000Z' });
+    expect(parseOverride('{bad json')).toBeNull();
+    expect(parseOverride('{"theme":"neon","until":"x"}')).toBeNull();
+    expect(parseOverride('')).toBeNull();
+  });
+});
+```
+
+Create `src/app/core/theme.service.spec.ts`:
+
+```ts
+import { TestBed } from '@angular/core/testing';
+import { ThemeService } from './theme.service';
+
+const ist = (day: string, hhmm: string) => new Date(`${day}T${hhmm}:00+05:30`);
+
+describe('ThemeService', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    delete document.documentElement.dataset['theme'];
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  function start(at: Date): ThemeService {
+    vi.setSystemTime(at);
+    const service = TestBed.inject(ThemeService);
+    TestBed.tick();
+    return service;
+  }
+
+  it('applies Auto by the clock and remembers the last theme for the pre-boot script', () => {
+    const s = start(ist('2026-10-19', '14:00'));
+    expect(s.theme()).toBe('bento');
+    expect(document.documentElement.dataset['theme']).toBe('bento');
+    expect(localStorage.getItem('theme-last')).toBe('bento');
+  });
+
+  it('◐ under Auto overrides only until the next switch-over', () => {
+    const s = start(ist('2026-10-19', '14:00'));
+    s.toggle();
+    TestBed.tick();
+    expect(s.theme()).toBe('matrix');
+    expect(document.documentElement.dataset['theme']).toBe('matrix');
+    vi.setSystemTime(ist('2026-10-20', '07:00'));
+    vi.advanceTimersByTime(20_000);
+    TestBed.tick();
+    expect(s.theme()).toBe('bento');
+  });
+
+  it('a fixed preference ignores the clock, and ◐ then switches the preference', () => {
+    const s = start(ist('2026-10-19', '14:00'));
+    s.setPref('matrix');
+    TestBed.tick();
+    expect(s.theme()).toBe('matrix');
+    s.toggle();
+    expect(s.pref()).toBe('bento');
+    expect(localStorage.getItem('theme-pref')).toBe('bento');
+  });
+
+  it('still works when storage is blocked', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    const s = start(ist('2026-10-19', '20:00'));
+    expect(s.theme()).toBe('matrix');
+    s.toggle();
+    TestBed.tick();
+    expect(s.theme()).toBe('bento');
   });
 });
 ```
@@ -3030,6 +3332,145 @@ export function hhmmOf(date: Date): string {
   const m = istMinutesOf(date);
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
+
+export function greetingName(email: string): string {
+  const first = (email.split('@')[0] ?? '').split(/[.+_-]/)[0] ?? '';
+  return first ? first[0].toUpperCase() + first.slice(1).toLowerCase() : '';
+}
+```
+
+Create `src/app/core/storage.ts`:
+
+```ts
+// Per-device conveniences only; storage can be unavailable (private mode) and that's fine.
+export function storageGet(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+export function storageSet(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Nothing to do: the setting just won't be remembered.
+  }
+}
+```
+
+Create `src/app/core/motion.ts`:
+
+```ts
+export function reducedMotion(): boolean {
+  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+```
+
+Create `src/app/core/theme.ts`:
+
+```ts
+import { istMinutesOf } from '@shared/days';
+
+export type Theme = 'bento' | 'matrix';
+export type ThemePref = 'auto' | Theme;
+export interface ThemeOverride {
+  theme: Theme;
+  until: string;
+}
+
+const DAY_START = 6 * 60;
+const NIGHT_START = 19 * 60;
+const isTheme = (v: unknown): v is Theme => v === 'bento' || v === 'matrix';
+
+/** Bento from 06:00 to 18:59 IST, Matrix otherwise. */
+export function autoTheme(now: Date): Theme {
+  const m = istMinutesOf(now);
+  return m >= DAY_START && m < NIGHT_START ? 'bento' : 'matrix';
+}
+
+/** The next 06:00 or 19:00 IST after `now`. */
+export function nextSwitch(now: Date): Date {
+  const m = istMinutesOf(now);
+  const target = m < DAY_START ? DAY_START : m < NIGHT_START ? NIGHT_START : DAY_START + 1440;
+  const minuteStart = now.getTime() - (now.getTime() % 60_000);
+  return new Date(minuteStart + (target - m) * 60_000);
+}
+
+export function effectiveTheme(pref: ThemePref, override: ThemeOverride | null, now: Date): Theme {
+  if (pref !== 'auto') return pref;
+  if (override && Date.parse(override.until) > now.getTime()) return override.theme;
+  return autoTheme(now);
+}
+
+export function parsePref(raw: string | null): ThemePref {
+  return raw === 'bento' || raw === 'matrix' ? raw : 'auto';
+}
+
+export function parseOverride(raw: string | null): ThemeOverride | null {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as { theme?: unknown; until?: unknown };
+    return isTheme(v.theme) && typeof v.until === 'string' && !Number.isNaN(Date.parse(v.until)) ? { theme: v.theme, until: v.until } : null;
+  } catch {
+    return null;
+  }
+}
+```
+
+Create `src/app/core/theme.service.ts`:
+
+```ts
+import { computed, effect, inject, Injectable, signal } from '@angular/core';
+import { Clock } from './clock';
+import { reducedMotion } from './motion';
+import { storageGet, storageSet } from './storage';
+import { effectiveTheme, nextSwitch, parseOverride, parsePref, type Theme, type ThemeOverride, type ThemePref } from './theme';
+
+const PREF = 'theme-pref';
+const OVERRIDE = 'theme-override';
+const LAST = 'theme-last';
+
+@Injectable({ providedIn: 'root' })
+export class ThemeService {
+  private readonly clock = inject(Clock);
+  readonly pref = signal<ThemePref>(parsePref(storageGet(PREF)));
+  private readonly override = signal<ThemeOverride | null>(parseOverride(storageGet(OVERRIDE)));
+  readonly theme = computed<Theme>(() => effectiveTheme(this.pref(), this.override(), this.clock.instant()));
+
+  constructor() {
+    effect(() => applyTheme(this.theme()));
+  }
+
+  setPref(pref: ThemePref): void {
+    this.pref.set(pref);
+    storageSet(PREF, pref);
+    this.override.set(null);
+    storageSet(OVERRIDE, '');
+  }
+
+  /** Under Auto: flip until the next 06:00 / 19:00 switch-over. Under a fixed preference: switch it. */
+  toggle(): void {
+    const next: Theme = this.theme() === 'bento' ? 'matrix' : 'bento';
+    if (this.pref() !== 'auto') return this.setPref(next);
+    const override: ThemeOverride = { theme: next, until: nextSwitch(this.clock.instant()).toISOString() };
+    this.override.set(override);
+    storageSet(OVERRIDE, JSON.stringify(override));
+  }
+}
+
+function applyTheme(theme: Theme): void {
+  const root = document.documentElement;
+  const swap = () => {
+    root.dataset['theme'] = theme;
+    storageSet(LAST, theme);
+  };
+  if (root.dataset['theme'] === theme) return swap();
+  const doc = document as Document & { startViewTransition?: (update: () => void) => unknown };
+  if (doc.startViewTransition && !reducedMotion()) doc.startViewTransition(swap);
+  else swap();
+}
 ```
 
 - [ ] **Step 4: Login page**
@@ -3046,7 +3487,7 @@ import { AuthService } from '../../core/auth.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <main class="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-4 px-6">
-      <h1 class="text-3xl font-black">Countdown</h1>
+      <h1 class="num text-5xl">Countdown<span class="text-accent">.</span></h1>
       <p class="muted">Sign in to your tracker.</p>
       <form class="flex flex-col gap-3" (submit)="submit($event, email.value, password.value)">
         <input #email class="field" type="email" name="email" autocomplete="username" placeholder="Email" required />
@@ -3091,14 +3532,17 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
   template: `
+    <!-- Floating pill on the phone (icons in Bento, uppercase words in Matrix); a sidebar on wide screens. -->
     <nav aria-label="Main"
-      class="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-black/90 pb-[env(safe-area-inset-bottom)] backdrop-blur
-             lg:static lg:w-48 lg:shrink-0 lg:border-0 lg:bg-transparent lg:pt-6">
-      <ul class="mx-auto flex max-w-md justify-around lg:flex-col lg:gap-1">
+      class="fixed inset-x-0 bottom-0 z-20 flex justify-center pb-[calc(env(safe-area-inset-bottom)+12px)]
+             lg:static lg:block lg:w-48 lg:shrink-0 lg:pb-0 lg:pt-6">
+      <ul class="flex gap-1 rounded-full bg-[#161616]/95 px-2 py-1.5 shadow-lg backdrop-blur
+                 matrix:border matrix:border-line matrix:bg-black/95
+                 lg:flex-col lg:rounded-2xl lg:bg-transparent lg:shadow-none">
         @for (tab of tabs; track tab.path) {
           <li>
-            <a [routerLink]="tab.path" routerLinkActive="!text-steps font-bold" ariaCurrentWhenActive="page"
-              class="flex flex-col items-center gap-0.5 px-4 py-2 text-[11px] text-muted lg:flex-row lg:gap-3 lg:rounded-xl lg:px-3 lg:text-sm"><span class="text-lg" aria-hidden="true">{{ tab.icon }}</span>{{ tab.label }}</a>
+            <a [routerLink]="tab.path" routerLinkActive="is-active" ariaCurrentWhenActive="page"
+              class="tab press flex items-center gap-1.5 rounded-full px-3 py-2 text-xs text-muted lg:rounded-xl lg:text-sm"><span class="text-base matrix:hidden" aria-hidden="true">{{ tab.icon }}</span>{{ tab.label }}</a>
           </li>
         }
       </ul>
@@ -3213,19 +3657,20 @@ export const routes: Routes = [
 ];
 ```
 
-In `src/app/app.config.ts`, change the router provider to bind route params to inputs:
+In `src/app/app.config.ts`, change the router provider to bind route params to inputs and crossfade between screens (spec §4.0.1):
 
 ```ts
-import { provideRouter, withComponentInputBinding } from '@angular/router';
+import { provideRouter, withComponentInputBinding, withViewTransitions } from '@angular/router';
 // …
-    provideRouter(routes, withComponentInputBinding()),
+    provideRouter(routes, withComponentInputBinding(), withViewTransitions()),
 ```
 
 Replace `src/app/app.ts`:
 
 ```ts
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { ThemeService } from './core/theme.service';
 
 @Component({
   selector: 'app-root',
@@ -3233,17 +3678,25 @@ import { RouterOutlet } from '@angular/router';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<router-outlet />`,
 })
-export class App {}
+export class App {
+  // Created at startup so the theme is applied on the login screen too.
+  private readonly theme = inject(ThemeService);
+}
 ```
 
 - [ ] **Step 7: Run the tests to see them pass**
 
 Run: `npx ng test --watch=false`
-Expected: PASS — format (5), clock (1), tab-bar (1), login (2), routing (1), plus domain suites.
+Expected: PASS — format (6), theme rules (4), ThemeService (4), clock (1), tab-bar (1), login (2), routing (1), plus domain suites.
 
 - [ ] **Step 8: Browser check**
 
-Run `npx ng serve` (background). Open `http://localhost:4200/` in a phone-sized (390×844) and a desktop-sized (1280×800) browser window. Expected: redirected to `/login`; black page with "Countdown", email/password fields, lime "Sign in" button. Sign in with the **test user** (`.env.local`) → lands on `/today` showing the stub "Today" heading, with the bottom tab bar on phone width and a left sidebar on desktop width. Wrong password → "Email or password didn't match". Stop the server.
+Run `npx ng serve` (background). Open `http://localhost:4200/` in a phone-sized (390×844) and a desktop-sized (1280×800) browser window.
+- Redirected to `/login`: a black page with "Countdown." in Space Grotesk, email/password fields and a lime pill "Sign in" button. In DevTools console, `localStorage.setItem('theme-pref','matrix')` + reload → the same page in Space Mono with a white uppercase button and the title in Doto dot-matrix. Set it back to `auto`.
+- Sign in with the **test user** (`.env.local`) → lands on `/today` showing the stub "Today" heading. The floating tab-bar pill is at the bottom on phone width (icons in Bento, uppercase words in Matrix) and becomes a left sidebar on desktop width. Switching tabs crossfades.
+- Wrong password → "Email or password didn't match".
+
+Stop the server.
 
 - [ ] **Step 9: Commit**
 
@@ -4067,20 +4520,34 @@ git commit -m "Add data layer: row mapping, history, API and store" -m "Co-Autho
 ```
 
 ---
-### Task 10: Today screen and the Perfect Day moment
+### Task 10: Today screen (bento grid), theme-aware UI primitives and the Perfect Day moment
 
 **Files:**
-- Create: `src/app/core/storage.ts`
+- Create: `src/app/ui/ring.ts`, `src/app/ui/meter.ts`, `src/app/ui/count-up.ts`, `src/app/ui/ui.spec.ts`
 - Create: `src/app/features/today/today.vm.ts`, `src/app/features/today/today.vm.spec.ts`
-- Create: `src/app/features/today/score-card.ts`, `countdowns-card.ts`, `fasting-card.ts`, `rings-card.ts`, `workout-card.ts`, `routines-card.ts`, `challenges-card.ts`, `today-cards.spec.ts` (all in `src/app/features/today/`)
+- Create (all in `src/app/features/today/`): `score-card.ts`, `countdowns-card.ts`, `fasting-card.ts`, `steps-tile.ts`, `calories-tile.ts`, `workout-card.ts`, `routines-card.ts`, `challenges-card.ts`, `today-cards.spec.ts`
 - Create: `src/app/features/shell/perfect-day.ts`, `src/app/features/shell/perfect-day.spec.ts`
 - Modify: `src/app/features/today/today.page.ts` (replace stub), `src/app/features/shell/shell.ts`
 
 **Interfaces:**
-- Consumes: `TrackerStore` (Task 9), `Clock`, `Online` (Task 8), domain (Tasks 3–5), `@shared/windows` (`fastState`, `formatClock`, `toMinutes`), format helpers (Task 8).
-- Produces (`storage.ts`): `storageGet(key): string | null`, `storageSet(key, value): void` (both swallow storage errors).
+- Consumes: `TrackerStore` (Task 9), `Clock`, `Online`, `AuthService`, `ThemeService`, `storageGet/Set`, `reducedMotion` (Task 8), domain (Tasks 3–5), `@shared/windows` (`fastState`, `formatClock`, `toMinutes`), format helpers (Task 8).
+- Produces (`src/app/ui/`):
+  - `app-ring` (`fraction`, `color`, `track`, `size`; content is centred inside): an arc in Bento, 30 dots in Matrix, filling from 0
+  - `app-meter` (`fraction`, `color`, `track`, `marker: number | null`): a bar in Bento, 10 dots in Matrix
+  - `app-count` (`value`, `format`): counts up, instant under Reduce Motion
 - Produces (`today.vm.ts`): `TodayInput`, `TodayVm` (fields below), `CountdownTile`, `FastingVm`, `RoutineGroupVm`, `WeeklyVm`, `ChallengeGroupVm`, `ChallengeRowVm`, `buildTodayVm(input): TodayVm`.
-- Produces (components, selectors): `app-score-card` (`score`, `perfect`, `streak`), `app-countdowns-card` (`tiles`), `app-fasting-card` (`fasting`), `app-rings-card` (`vm`), `app-workout-card` (`workouts`, `disabled`; outputs `trained`, `remove`), `app-routines-card` (`groups`, `weekly`, `today`, `disabled`; output `toggle: string`), `app-challenges-card` (`group`), `app-perfect-day` (`perfect`, `today`, `rings`, `streak`, `countThisMonth`).
+- Produces (tiles, selectors):
+  - `app-score-card` (`score`, `perfect`, `streak`)
+  - `app-countdowns-card` (`tiles`)
+  - `app-fasting-card` (`fasting`)
+  - `app-steps-tile` (`steps`, `goal`, `lastSyncAt`, `stale`)
+  - `app-calories-tile` (`kcal`, `goal`)
+  - `app-workout-card` (`workouts`, `disabled`; outputs `trained`, `remove`)
+  - `app-routines-card` (`groups`, `weekly`, `today`, `done`, `total`, `disabled`; output `toggle: string`)
+  - `app-challenges-card` (`group`)
+  - `app-perfect-day` (`perfect`, `today`, `rings`, `streak`, `countThisMonth`)
+
+Tile tones (spec §4.0): countdown **pink**, score **lime**, steps **blue**, fasting **violet**, calories **orange**; routines, workout and challenges are neutral. In Matrix every tone renders as a bordered black box automatically (CSS), so templates only set `data-tone`.
 
 - [ ] **Step 1: Write the failing view-model tests**
 
@@ -4159,28 +4626,7 @@ describe('buildTodayVm', () => {
 
 Run: `npx ng test --watch=false` → Expected: FAIL — cannot resolve `./today.vm`.
 
-- [ ] **Step 3: Implement storage and the view model**
-
-Create `src/app/core/storage.ts`:
-
-```ts
-// Per-device conveniences only; storage can be unavailable (private mode) and that's fine.
-export function storageGet(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-export function storageSet(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // Nothing to do: the setting just won't be remembered.
-  }
-}
-```
+- [ ] **Step 3: Implement the view model**
 
 Create `src/app/features/today/today.vm.ts`:
 
@@ -4318,7 +4764,76 @@ export function buildTodayVm(i: TodayInput): TodayVm {
 
 Run: `npx ng test --watch=false` → Expected: `today.vm.spec.ts` PASS (6).
 
-- [ ] **Step 4: Write the failing component tests**
+- [ ] **Step 4: Write the failing UI-primitive and tile tests**
+
+Create `src/app/ui/ui.spec.ts`:
+
+```ts
+import { TestBed } from '@angular/core/testing';
+import type { Type } from '@angular/core';
+import { ThemeService } from '../core/theme.service';
+import { CountUp } from './count-up';
+import { Meter } from './meter';
+import { Ring } from './ring';
+
+async function render<T>(type: Type<T>, inputs: Record<string, unknown>): Promise<HTMLElement> {
+  const fixture = TestBed.createComponent(type);
+  for (const [k, v] of Object.entries(inputs)) fixture.componentRef.setInput(k, v);
+  await fixture.whenStable();
+  return fixture.nativeElement as HTMLElement;
+}
+
+describe('UI primitives', () => {
+  beforeEach(() => localStorage.clear());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('Ring draws an arc in Bento and 30 dots (half lit) in Matrix', async () => {
+    TestBed.inject(ThemeService).setPref('bento');
+    const bento = await render(Ring, { fraction: 0.5 });
+    expect(bento.querySelector('[data-arc]')).not.toBeNull();
+    expect(bento.querySelectorAll('[data-dot]')).toHaveLength(0);
+
+    TestBed.inject(ThemeService).setPref('matrix');
+    const matrix = await render(Ring, { fraction: 0.5 });
+    const dots = [...matrix.querySelectorAll('[data-dot]')];
+    expect(dots).toHaveLength(30);
+    expect(dots.filter((d) => d.getAttribute('fill') === '#ff3b30')).toHaveLength(15);
+  });
+
+  it('Ring treats a missing goal (NaN) as empty instead of breaking', async () => {
+    TestBed.inject(ThemeService).setPref('bento');
+    const el = await render(Ring, { fraction: Number.NaN });
+    expect(el.querySelector('[data-arc]')?.getAttribute('stroke-dasharray')).toBe('0 999');
+  });
+
+  it('Meter draws a bar in Bento and 10 dots in Matrix', async () => {
+    TestBed.inject(ThemeService).setPref('bento');
+    const bento = await render(Meter, { fraction: 0.78 });
+    expect((bento.querySelector('[data-bar]') as HTMLElement).style.width).toBe('78%');
+
+    TestBed.inject(ThemeService).setPref('matrix');
+    const matrix = await render(Meter, { fraction: 0.78 });
+    const dots = [...matrix.querySelectorAll('[data-dot]')];
+    expect(dots).toHaveLength(10);
+    expect(dots.filter((d) => d.getAttribute('data-on') === 'true')).toHaveLength(8);
+  });
+
+  it('CountUp jumps straight to the value under Reduce Motion', async () => {
+    const el = await render(CountUp, { value: 7842 });
+    expect(el.textContent?.trim()).toBe('7,842');
+  });
+
+  it('CountUp animates to the value when motion is allowed', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      cb(performance.now() + 1000);
+      return 1;
+    });
+    const el = await render(CountUp, { value: 120 });
+    expect(el.textContent?.trim()).toBe('120');
+  });
+});
+```
 
 Create `src/app/features/today/today-cards.spec.ts`:
 
@@ -4332,6 +4847,7 @@ import { CountdownsCard } from './countdowns-card';
 import { FastingCard } from './fasting-card';
 import { RoutinesCard } from './routines-card';
 import { ScoreCard } from './score-card';
+import { StepsTile } from './steps-tile';
 import { WorkoutCard } from './workout-card';
 
 async function render<T>(type: Type<T>, inputs: Record<string, unknown>) {
@@ -4343,12 +4859,13 @@ async function render<T>(type: Type<T>, inputs: Record<string, unknown>) {
 
 const progress = (status: string) => ({ done: 6, target: 15, window: 20, elapsed: 7, left: 13, status, pace: 0.35, needed: 9, endDay: '2026-11-07', finished: false });
 
-describe('Today cards', () => {
+describe('Today tiles', () => {
   beforeEach(() => TestBed.configureTestingModule({ providers: [provideRouter([])] }));
 
-  it('ScoreCard shows the live score, Perfect Day text and the freeze chip only when available', async () => {
+  it('ScoreCard shows the live score, Perfect Day text and the freeze only when available', async () => {
     const streak = { length: 12, freezeAvailable: true, frozen: new Set() };
     const { el } = await render(ScoreCard, { score: { done: 4, total: 8, score: 50 }, perfect: false, streak });
+    expect(el.querySelector('section')?.getAttribute('data-tone')).toBe('lime');
     expect(el.textContent).toContain('50');
     expect(el.textContent).toContain('4 of 8 done · 4 to go for a ⭐ Perfect Day');
     expect(el.textContent).toContain('🔥 12-day streak');
@@ -4358,10 +4875,16 @@ describe('Today cards', () => {
     expect(perfect.el.textContent).not.toContain('freeze');
   });
 
-  it('CountdownsCard shows days left, and a report link on the day', async () => {
-    const { el } = await render(CountdownsCard, { tiles: [{ id: 'd', title: 'Diwali', emoji: '🪔', days: 20, isToday: false }] });
+  it('CountdownsCard shows the soonest countdown big, and a report link on the day', async () => {
+    const { el } = await render(CountdownsCard, {
+      tiles: [{ id: 'd', title: 'Diwali', emoji: '🪔', days: 20, isToday: false }, { id: 'e', title: 'Engagement', emoji: '💍', days: 52, isToday: false }],
+    });
+    expect(el.querySelector('section')?.getAttribute('data-tone')).toBe('pink');
+    expect(el.textContent).toContain('🪔 Diwali');
     expect(el.textContent).toContain('20');
-    expect(el.textContent).toContain('days to 🪔 Diwali');
+    expect(el.textContent).toContain('days to go');
+    expect(el.textContent).toContain('💍 Engagement');
+    expect(el.textContent).toContain('52');
     const onDay = await render(CountdownsCard, { tiles: [{ id: 'd', title: 'Diwali', emoji: '🪔', days: 0, isToday: true }] });
     expect(onDay.el.textContent).toContain('Today! 🪔');
     expect(onDay.el.querySelector('a')?.getAttribute('href')).toBe('/report/d');
@@ -4370,17 +4893,30 @@ describe('Today cards', () => {
   it('FastingCard switches between open and fasting', async () => {
     const open = await render(FastingCard, { fasting: { kind: 'open', closesAt: '1:00 PM', minutesLeft: 90, fraction: 0.25 } });
     expect(open.el.textContent).toContain('🍽️ Eating window');
-    expect(open.el.textContent).toContain('closes 1:00 PM · 1h 30m left');
+    expect(open.el.textContent).toContain('1h 30m');
+    expect(open.el.textContent).toContain('left · closes 1:00 PM');
     const fasting = await render(FastingCard, { fasting: { kind: 'fasting', nextAt: '12:00 AM', minutesUntilNext: 600, doneMinutes: 60, fraction: 0.09 } });
-    expect(fasting.el.textContent).toContain('🌙 Fasting · 1h done');
-    expect(fasting.el.textContent).toContain('next window 12:00 AM in 10h');
+    expect(fasting.el.textContent).toContain('🌙 Fasting');
+    expect(fasting.el.textContent).toContain('opens 12:00 AM · in 10h');
   });
 
-  it('RoutinesCard emits the habit id when a routine is tapped', async () => {
+  it('StepsTile shows the count, the goal and a stale-sync warning', async () => {
+    const fresh = await render(StepsTile, { steps: 7842, goal: 10000, lastSyncAt: '2026-10-19T12:30:00Z', stale: false });
+    expect(fresh.el.textContent).toContain('7,842');
+    expect(fresh.el.textContent).toContain('of 10k');
+    expect(fresh.el.textContent).toContain('synced 6:00 PM');
+    const stale = await render(StepsTile, { steps: 0, goal: 10000, lastSyncAt: '2026-10-18T12:30:00Z', stale: true });
+    expect(stale.el.textContent).toContain('⚠️ last synced Sun 18 Oct, 6:00 PM');
+    const never = await render(StepsTile, { steps: 0, goal: 10000, lastSyncAt: null, stale: true });
+    expect(never.el.textContent).toContain('not synced yet');
+  });
+
+  it('RoutinesCard shows the count and emits the habit id when a pill is tapped', async () => {
     const am = habit('am', { name: 'AM skincare', emoji: '🧴' });
     const { fixture, el } = await render(RoutinesCard, {
-      groups: [{ slot: 'morning', label: 'Morning', items: [{ habit: am, done: false }] }], weekly: [], today: '2026-10-19', disabled: false,
+      groups: [{ slot: 'morning', label: 'Morning', items: [{ habit: am, done: false }] }], weekly: [], today: '2026-10-19', done: 0, total: 1, disabled: false,
     });
+    expect(el.textContent).toContain('0/1');
     const emitted: string[] = [];
     fixture.componentInstance.toggle.subscribe((id: string) => emitted.push(id));
     (el.querySelector('[role=checkbox]') as HTMLButtonElement).click();
@@ -4453,41 +4989,183 @@ describe('PerfectDay', () => {
 
 - [ ] **Step 5: Run them to see them fail**
 
-Run: `npx ng test --watch=false` → Expected: FAIL — cannot resolve the card components and `./perfect-day`.
+Run: `npx ng test --watch=false` → Expected: FAIL — unresolved `./ring`, `./meter`, `./count-up`, the tile components and `./perfect-day`.
 
-- [ ] **Step 6: The cards**
+- [ ] **Step 6: The theme-aware primitives**
+
+Create `src/app/ui/ring.ts`:
+
+```ts
+import { afterNextRender, ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { ThemeService } from '../core/theme.service';
+
+const R = 26;
+const DOTS = 30;
+const clamp01 = (v: number) => (Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0);
+
+/** Progress ring: a solid arc in Bento, a ring of dots in Matrix. Fills from 0 after first render. */
+@Component({
+  selector: 'app-ring',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'inline-grid shrink-0 place-items-center', '[style.width.px]': 'size()', '[style.height.px]': 'size()' },
+  template: `
+    <svg viewBox="0 0 64 64" class="-rotate-90 [grid-area:1/1]" [attr.width]="size()" [attr.height]="size()" aria-hidden="true">
+      @if (matrix()) {
+        @for (d of dots(); track $index) {
+          <circle data-dot [attr.cx]="d.x" [attr.cy]="d.y" r="2.3" [attr.fill]="d.on ? '#ff3b30' : '#2a2a2a'" />
+        }
+      } @else {
+        <circle cx="32" cy="32" [attr.r]="r" fill="none" [attr.stroke]="track()" stroke-width="8" />
+        <circle data-arc class="ring-arc" cx="32" cy="32" [attr.r]="r" fill="none" [attr.stroke]="color()" stroke-width="8" stroke-linecap="round" [attr.stroke-dasharray]="dash()" />
+      }
+    </svg>
+    <div class="[grid-area:1/1] text-center leading-none"><ng-content /></div>
+  `,
+})
+export class Ring {
+  readonly fraction = input.required<number>();
+  readonly color = input('#000000');
+  readonly track = input('rgb(0 0 0 / 0.18)');
+  readonly size = input(56);
+  protected readonly r = R;
+  private readonly theme = inject(ThemeService);
+  protected readonly matrix = computed(() => this.theme.theme() === 'matrix');
+  private readonly shown = signal(false);
+  private readonly f = computed(() => (this.shown() ? clamp01(this.fraction()) : 0));
+  protected readonly dash = computed(() => `${2 * Math.PI * R * this.f()} 999`);
+  protected readonly dots = computed(() =>
+    Array.from({ length: DOTS }, (_, i) => {
+      const a = (i / DOTS) * 2 * Math.PI;
+      return { x: 32 + R * Math.cos(a), y: 32 + R * Math.sin(a), on: i < Math.round(this.f() * DOTS) };
+    }),
+  );
+
+  constructor() {
+    afterNextRender(() => this.shown.set(true));
+  }
+}
+```
+
+Create `src/app/ui/meter.ts`:
+
+```ts
+import { afterNextRender, ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { ThemeService } from '../core/theme.service';
+
+const clamp01 = (v: number) => (Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0);
+
+/** Progress bar: a rounded bar in Bento, ten dots in Matrix. `marker` (0–1) shows where you should be. */
+@Component({
+  selector: 'app-meter',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'block' },
+  template: `
+    @if (matrix()) {
+      <div class="flex gap-1" aria-hidden="true">
+        @for (d of dots(); track $index) {
+          <span data-dot [attr.data-on]="d.on" class="size-[7px] rounded-full"
+            [class]="d.on ? 'bg-[#f2f2f2]' : d.marker ? 'border border-accent' : 'bg-[#2a2a2a]'"></span>
+        }
+      </div>
+    } @else {
+      <div class="relative h-1.5 rounded-full" [style.background]="track()" aria-hidden="true">
+        <div data-bar class="meter-fill h-full rounded-full" [style.width.%]="f() * 100" [style.background]="color()"></div>
+        @if (marker(); as m) {
+          <span class="absolute -top-0.5 h-2.5 w-0.5 rounded bg-white/80" [style.left.%]="m * 100"></span>
+        }
+      </div>
+    }
+  `,
+})
+export class Meter {
+  readonly fraction = input.required<number>();
+  readonly color = input('#000000');
+  readonly track = input('rgb(0 0 0 / 0.2)');
+  readonly marker = input<number | null>(null);
+  private readonly theme = inject(ThemeService);
+  protected readonly matrix = computed(() => this.theme.theme() === 'matrix');
+  private readonly shown = signal(false);
+  protected readonly f = computed(() => (this.shown() ? clamp01(this.fraction()) : 0));
+  protected readonly dots = computed(() => {
+    const on = Math.round(clamp01(this.fraction()) * 10);
+    const m = this.marker();
+    const markerIndex = m === null ? -1 : Math.min(9, Math.floor(clamp01(m) * 10));
+    return Array.from({ length: 10 }, (_, i) => ({ on: i < on, marker: i === markerIndex && i >= on }));
+  });
+
+  constructor() {
+    afterNextRender(() => this.shown.set(true));
+  }
+}
+```
+
+Create `src/app/ui/count-up.ts`:
+
+```ts
+import { ChangeDetectionStrategy, Component, effect, input, signal, untracked } from '@angular/core';
+import { formatNumber } from '../core/format';
+import { reducedMotion } from '../core/motion';
+
+/** Counts up to each new value over ~600 ms; instant under Reduce Motion. */
+@Component({
+  selector: 'app-count',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `{{ format()(shown()) }}`,
+})
+export class CountUp {
+  readonly value = input.required<number>();
+  readonly format = input<(n: number) => string>(formatNumber);
+  protected readonly shown = signal(0);
+
+  constructor() {
+    effect((onCleanup) => {
+      const target = this.value();
+      const from = untracked(this.shown);
+      if (from === target || reducedMotion() || typeof requestAnimationFrame !== 'function') {
+        this.shown.set(target);
+        return;
+      }
+      const start = performance.now();
+      let frame = 0;
+      const step = (now: number) => {
+        const p = Math.min(1, (now - start) / 600);
+        this.shown.set(Math.round(from + (target - from) * (1 - (1 - p) ** 3)));
+        if (p < 1) frame = requestAnimationFrame(step);
+      };
+      frame = requestAnimationFrame(step);
+      onCleanup(() => cancelAnimationFrame(frame));
+    });
+  }
+}
+```
+
+- [ ] **Step 7: The tiles**
 
 Create `src/app/features/today/score-card.ts`:
 
 ```ts
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import type { DayScore } from '../../domain/scoring';
 import type { StreakInfo } from '../../domain/streaks';
+import { CountUp } from '../../ui/count-up';
+import { Ring } from '../../ui/ring';
 
 @Component({
   selector: 'app-score-card',
+  imports: [CountUp, Ring],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'block' },
   template: `
-    <section class="card flex items-center gap-3" aria-label="Today's score">
-      <div class="relative size-16 shrink-0">
-        <svg viewBox="0 0 64 64" class="size-16 -rotate-90" aria-hidden="true">
-          <circle cx="32" cy="32" r="27" fill="none" stroke="#2c2c2e" stroke-width="7" />
-          <circle cx="32" cy="32" r="27" fill="none" stroke="#ffd60a" stroke-width="7" stroke-linecap="round" [attr.stroke-dasharray]="dash()" />
-        </svg>
-        <div class="absolute inset-0 flex flex-col items-center justify-center leading-none">
-          <b class="text-lg">{{ score().score }}</b><span class="text-[8px] text-muted">LIVE</span>
+    <section class="tile press h-full" data-tone="lime" aria-label="Today's score">
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <p class="label">Score · live</p>
+          <p class="num mt-1 text-[46px]"><app-count [value]="score().score" /></p>
         </div>
+        <app-ring [fraction]="score().score / 100" [size]="48" />
       </div>
-      <div class="min-w-0 flex-1">
-        <p class="text-sm font-bold">Today's score</p>
-        <p class="muted">{{ perfect() ? '⭐ Perfect Day!' : score().done + ' of ' + score().total + ' done · ' + (score().total - score().done) + ' to go for a ⭐ Perfect Day' }}</p>
-        <div class="mt-2 flex flex-wrap gap-1.5">
-          <span class="whitespace-nowrap rounded-lg bg-[#3a2a10] px-2 py-0.5 text-xs font-extrabold text-streak">🔥 {{ streak().length }}-day streak</span>
-          @if (streak().freezeAvailable) {
-            <span class="whitespace-nowrap rounded-lg bg-[#10303a] px-2 py-0.5 text-xs font-bold text-routine">❄️ 1 freeze</span>
-          }
-        </div>
-      </div>
+      <p class="mt-1 text-xs font-bold">{{ perfect() ? '⭐ Perfect Day!' : score().done + ' of ' + score().total + ' done · ' + (score().total - score().done) + ' to go for a ⭐ Perfect Day' }}</p>
+      <p class="mt-1 text-xs font-bold"><span class="flicker">🔥</span> {{ streak().length }}-day streak{{ streak().freezeAvailable ? ' · ❄️ 1 freeze' : '' }}</p>
     </section>
   `,
 })
@@ -4495,139 +5173,162 @@ export class ScoreCard {
   readonly score = input.required<DayScore>();
   readonly perfect = input.required<boolean>();
   readonly streak = input.required<StreakInfo>();
-  protected readonly dash = computed(() => `${(2 * Math.PI * 27 * this.score().score) / 100} 999`);
 }
 ```
 
 Create `src/app/features/today/countdowns-card.ts`:
 
 ```ts
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { CountUp } from '../../ui/count-up';
 import type { CountdownTile } from './today.vm';
 
 @Component({
   selector: 'app-countdowns-card',
-  imports: [RouterLink],
+  imports: [RouterLink, CountUp],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'block' },
   template: `
-    <section class="card flex justify-around bg-gradient-to-br from-card to-raised text-center" aria-label="Countdowns">
-      @for (t of tiles(); track t.id; let first = $first, last = $last) {
-        <div class="px-2">
-          @if (t.isToday) {
-            <p class="text-2xl font-black text-count">Today! {{ t.emoji }}</p>
-            <p class="muted">{{ t.title }}</p>
-            <a class="mt-1 inline-block text-xs font-bold text-routine" [routerLink]="['/report', t.id]">See your report card →</a>
-          } @else {
-            <p class="text-3xl font-black leading-none" [class.text-count]="first" [class.text-kcal]="!first">{{ t.days }}</p>
-            <p class="muted">{{ t.days === 1 ? 'day' : 'days' }} to {{ t.emoji }} {{ t.title }}</p>
-          }
+    <section class="tile press h-full" data-tone="pink" aria-label="Countdowns">
+      @if (main(); as m) {
+        <div class="flex items-end justify-between gap-3">
+          <div>
+            <p class="label">{{ m.emoji }} {{ m.title }}</p>
+            @if (m.isToday) {
+              <p class="num mt-1 text-[40px]">Today! {{ m.emoji }}</p>
+              <a class="mt-1 inline-block text-xs font-bold underline" [routerLink]="['/report', m.id]">See your report card →</a>
+            } @else {
+              <p class="num mt-1 text-[64px]"><app-count [value]="m.days" /></p>
+              <p class="text-sm font-bold">{{ m.days === 1 ? 'day' : 'days' }} to go</p>
+            }
+          </div>
+          <div class="text-right">
+            @for (t of rest(); track t.id) {
+              <p class="label">{{ t.emoji }} {{ t.title }}</p>
+              @if (t.isToday) {
+                <a class="num mb-1 block text-[24px] underline" [routerLink]="['/report', t.id]">Today!</a>
+              } @else {
+                <p class="num text-[30px]">{{ t.days }}</p>
+                <p class="mb-1 text-[11px] font-bold">{{ t.days === 1 ? 'day' : 'days' }}</p>
+              }
+            }
+          </div>
         </div>
-        @if (!last) {
-          <div class="w-px bg-line"></div>
-        }
-      } @empty {
-        <p class="muted">No countdowns yet — add one in Settings.</p>
+      } @else {
+        <p class="text-sm font-bold">No countdowns yet — add one in Settings.</p>
       }
     </section>
   `,
 })
 export class CountdownsCard {
   readonly tiles = input.required<CountdownTile[]>();
+  protected readonly main = computed(() => this.tiles()[0] ?? null);
+  protected readonly rest = computed(() => this.tiles().slice(1, 3));
 }
 ```
 
 Create `src/app/features/today/fasting-card.ts`:
 
 ```ts
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { formatDuration } from '../../core/format';
+import { Meter } from '../../ui/meter';
 import type { FastingVm } from './today.vm';
 
 @Component({
   selector: 'app-fasting-card',
+  imports: [Meter],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'block' },
   template: `
     @let f = fasting();
-    <section class="card flex items-center gap-3" aria-label="Fasting">
-      <svg viewBox="0 0 64 64" class="size-14 shrink-0 -rotate-90" aria-hidden="true">
-        <circle cx="32" cy="32" r="26" fill="none" stroke="#2c2c2e" stroke-width="7" />
-        <circle cx="32" cy="32" r="26" fill="none" stroke-width="7" stroke-linecap="round" [attr.stroke]="f.kind === 'open' ? '#a3f53b' : '#bf5af2'" [attr.stroke-dasharray]="dash()" />
-      </svg>
+    <section class="tile press h-full" data-tone="violet" aria-label="Fasting">
       @if (f.kind === 'open') {
-        <div>
-          <p class="text-sm font-bold">🍽️ Eating window</p>
-          <p class="muted">closes {{ f.closesAt }} · {{ dur(f.minutesLeft) }} left</p>
-        </div>
+        <p class="label">🍽️ Eating window</p>
+        <p class="num mt-1 text-[30px]">{{ dur(f.minutesLeft) }}</p>
+        <p class="text-[11px] font-bold">left · closes {{ f.closesAt }}</p>
       }
       @if (f.kind === 'fasting') {
-        <div>
-          <p class="text-sm font-bold">🌙 Fasting · {{ dur(f.doneMinutes) }} done</p>
-          <p class="muted">next window {{ f.nextAt }} in {{ dur(f.minutesUntilNext) }}</p>
-        </div>
+        <p class="label">🌙 Fasting</p>
+        <p class="num mt-1 text-[30px]">{{ dur(f.doneMinutes) }}</p>
+        <p class="text-[11px] font-bold">opens {{ f.nextAt }} · in {{ dur(f.minutesUntilNext) }}</p>
       }
+      <app-meter class="mt-2" [fraction]="f.fraction" />
     </section>
   `,
 })
 export class FastingCard {
   readonly fasting = input.required<FastingVm>();
   protected readonly dur = formatDuration;
-  protected readonly dash = computed(() => `${2 * Math.PI * 26 * Math.min(1, this.fasting().fraction)} 999`);
 }
 ```
 
-Create `src/app/features/today/rings-card.ts`:
+Create `src/app/features/today/steps-tile.ts`:
 
 ```ts
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { appDayOf } from '@shared/days';
-import { dayLabel, formatCompact, formatNumber, timeOf } from '../../core/format';
-import type { TodayVm } from './today.vm';
+import { dayLabel, formatCompact, timeOf } from '../../core/format';
+import { CountUp } from '../../ui/count-up';
+import { Meter } from '../../ui/meter';
 
 @Component({
-  selector: 'app-rings-card',
-  imports: [RouterLink],
+  selector: 'app-steps-tile',
+  imports: [CountUp, Meter],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'block' },
   template: `
-    <section class="card flex items-center gap-3" aria-label="Rings">
-      <svg viewBox="0 0 64 64" class="size-20 shrink-0 -rotate-90" aria-hidden="true">
-        @for (r of rings(); track r.radius) {
-          <circle cx="32" cy="32" [attr.r]="r.radius" fill="none" [attr.stroke]="r.track" stroke-width="6" />
-          <circle cx="32" cy="32" [attr.r]="r.radius" fill="none" [attr.stroke]="r.color" stroke-width="6" stroke-linecap="round" [attr.stroke-dasharray]="r.dash" />
-        }
-      </svg>
-      <div class="text-sm leading-7">
-        <p><span class="text-steps">●</span> <b>{{ n(vm().steps) }}</b> / {{ compact(vm().stepGoal) }} steps</p>
-        <a routerLink="/food" class="block"><span class="text-kcal">●</span> <b>{{ n(vm().kcal) }}</b> / {{ n(vm().kcalGoal) }} kcal</a>
-        <p><span class="text-routine">●</span> <b>{{ vm().routinesDone }}</b> / {{ vm().routinesTotal }} routines</p>
-        <p class="text-xs" [class.text-streak]="vm().syncStale" [class.text-muted]="!vm().syncStale">{{ syncLabel() }}</p>
-      </div>
+    <section class="tile press h-full" data-tone="blue" aria-label="Steps">
+      <p class="label">Steps</p>
+      <p class="num mt-1 text-[34px]"><app-count [value]="steps()" /></p>
+      <app-meter class="mt-2" [fraction]="steps() / goal()" />
+      <p class="mt-1 text-[10px] font-bold">of {{ compact(goal()) }}</p>
+      <p class="mt-0.5 text-[10px]" [class.font-bold]="stale()">{{ syncLabel() }}</p>
     </section>
   `,
 })
-export class RingsCard {
-  readonly vm = input.required<TodayVm>();
-  protected readonly n = formatNumber;
+export class StepsTile {
+  readonly steps = input.required<number>();
+  readonly goal = input.required<number>();
+  readonly lastSyncAt = input.required<string | null>();
+  readonly stale = input.required<boolean>();
   protected readonly compact = formatCompact;
-
-  protected readonly rings = computed(() => {
-    const v = this.vm();
-    const ring = (radius: number, fraction: number, color: string, track: string) => ({
-      radius, color, track, dash: `${2 * Math.PI * radius * Math.max(0, Math.min(1, fraction))} 999`,
-    });
-    return [
-      ring(28, v.steps / v.stepGoal, '#a3f53b', '#2a3a1a'),
-      ring(20, v.kcal / v.kcalGoal, '#ff375f', '#3a1a22'),
-      ring(12, v.routinesTotal ? v.routinesDone / v.routinesTotal : 0, '#32d7fa', '#10303a'),
-    ];
-  });
-
   protected readonly syncLabel = computed(() => {
-    const at = this.vm().lastSyncAt;
-    if (!at) return 'Steps not synced yet';
-    return this.vm().syncStale ? `Steps last synced ${dayLabel(appDayOf(new Date(at)))}, ${timeOf(at)}` : `Steps synced ${timeOf(at)}`;
+    const at = this.lastSyncAt();
+    if (!at) return 'not synced yet';
+    return this.stale() ? `⚠️ last synced ${dayLabel(appDayOf(new Date(at)))}, ${timeOf(at)}` : `synced ${timeOf(at)}`;
   });
+}
+```
+
+Create `src/app/features/today/calories-tile.ts`:
+
+```ts
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { formatNumber } from '../../core/format';
+import { CountUp } from '../../ui/count-up';
+import { Meter } from '../../ui/meter';
+
+@Component({
+  selector: 'app-calories-tile',
+  imports: [RouterLink, CountUp, Meter],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'block' },
+  template: `
+    <a routerLink="/food" class="tile press block h-full" data-tone="orange" aria-label="Calories">
+      <p class="label">Calories</p>
+      <p class="num mt-1 text-[30px]"><app-count [value]="kcal()" /></p>
+      <p class="mt-1 text-[11px] font-bold">{{ kcal() > goal() ? n(kcal() - goal()) + ' over' : n(goal() - kcal()) + ' left' }}</p>
+      <app-meter class="mt-2" [fraction]="kcal() / goal()" />
+    </a>
+  `,
+})
+export class CaloriesTile {
+  readonly kcal = input.required<number>();
+  readonly goal = input.required<number>();
+  protected readonly n = formatNumber;
 }
 ```
 
@@ -4641,8 +5342,9 @@ import type { Workout } from '../../domain/types';
 @Component({
   selector: 'app-workout-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'block' },
   template: `
-    <section class="card" aria-label="Workout">
+    <section class="tile h-full" aria-label="Workout">
       <p class="label mb-1 text-steps">Workout · from Strong</p>
       @for (w of workouts(); track w.id) {
         <div class="flex items-center justify-between py-1 text-sm">
@@ -4655,7 +5357,7 @@ import type { Workout } from '../../domain/types';
           </span>
         </div>
       } @empty {
-        <button type="button" class="btn w-full" [disabled]="disabled()" (click)="trained.emit()">Trained today ✓</button>
+        <button type="button" class="btn press w-full" [disabled]="disabled()" (click)="trained.emit()">Trained today ✓</button>
       }
     </section>
   `,
@@ -4680,29 +5382,27 @@ import type { RoutineGroupVm, WeeklyVm } from './today.vm';
 @Component({
   selector: 'app-routines-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'block' },
   template: `
-    <section class="card" aria-label="Routines">
-      <p class="label mb-1 text-routine">Routines · tap to tick</p>
+    <section class="tile h-full" aria-label="Routines">
+      <p class="label mb-2">Routines · {{ done() }}/{{ total() }} · tap to tick</p>
       @for (g of groups(); track g.slot) {
-        <p class="mt-1 text-[10px] font-semibold uppercase text-muted">{{ g.label }}</p>
-        <div class="grid grid-cols-2 gap-x-2">
+        <p class="mb-1 text-[10px] font-semibold uppercase text-muted">{{ g.label }}</p>
+        <div class="mb-2 flex flex-wrap gap-1.5">
           @for (r of g.items; track r.habit.id) {
-            <button type="button" role="checkbox" [attr.aria-checked]="r.done" [disabled]="disabled()" (click)="toggle.emit(r.habit.id)"
-              class="flex items-center gap-2 py-1.5 text-left text-sm disabled:opacity-50">
-              <span class="grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-black"
-                [class]="r.done ? 'bg-routine text-black' : 'border-[1.5px] border-line'">{{ r.done ? '✓' : '' }}</span>
-              {{ r.habit.emoji }} {{ r.habit.name }}
-            </button>
+            <!-- The pill's ✓ / ○ / ● glyph comes from CSS so it can differ per theme. -->
+            <button type="button" role="checkbox" class="pill press" [class.pop]="r.done" [attr.aria-checked]="r.done"
+              [disabled]="disabled()" (click)="toggle.emit(r.habit.id)">{{ r.habit.emoji }} {{ r.habit.name }}</button>
           }
         </div>
       } @empty {
         <p class="muted">No routines yet — add habits in Settings.</p>
       }
       @for (w of weekly(); track w.habit.id) {
-        <div class="mt-2 flex items-center justify-between gap-2 border-t border-line pt-2 text-xs">
+        <div class="mt-1 flex items-center justify-between gap-2 border-t border-line pt-2 text-xs">
           <span>{{ w.habit.emoji }} {{ w.habit.name }} this week: {{ w.doneDay ? 'done ' + weekday(w.doneDay) + ' ✓' : 'not yet' }}</span>
           @if (!w.doneDay || w.doneDay === today()) {
-            <button type="button" class="btn-quiet !py-1 text-xs" [disabled]="disabled()" (click)="toggle.emit(w.habit.id)">{{ w.doneDay ? 'Undo' : 'Done today' }}</button>
+            <button type="button" class="btn-quiet press !py-1 text-xs" [disabled]="disabled()" (click)="toggle.emit(w.habit.id)">{{ w.doneDay ? 'Undo' : 'Done today' }}</button>
           }
         </div>
       }
@@ -4713,6 +5413,8 @@ export class RoutinesCard {
   readonly groups = input.required<RoutineGroupVm[]>();
   readonly weekly = input.required<WeeklyVm[]>();
   readonly today = input.required<Day>();
+  readonly done = input.required<number>();
+  readonly total = input.required<number>();
   readonly disabled = input(false);
   readonly toggle = output<string>();
   protected readonly weekday = weekdayShort;
@@ -4724,32 +5426,27 @@ Create `src/app/features/today/challenges-card.ts`:
 ```ts
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import type { ChallengeProgress, ChallengeStatus } from '../../domain/challenges';
+import { Meter } from '../../ui/meter';
 import type { ChallengeGroupVm } from './today.vm';
 
-const CHIPS: Record<ChallengeStatus, { text: string; cls: string; bar: string }> = {
-  on_track: { text: 'ON TRACK', cls: 'bg-[#1f3a10] text-steps', bar: '#a3f53b' },
-  behind: { text: 'BEHIND', cls: 'bg-[#3a1a22] text-kcal', bar: '#ff375f' },
-  won: { text: 'WON 🏆', cls: 'bg-[#3a2a00] text-count', bar: '#ffd60a' },
-  out_of_reach: { text: 'OUT OF REACH', cls: 'bg-raised text-muted', bar: '#8e8e93' },
-};
+const CHIP_TEXT: Record<ChallengeStatus, string> = { on_track: 'ON TRACK', behind: 'BEHIND', won: 'WON 🏆', out_of_reach: 'OUT OF REACH' };
+const BAR: Record<ChallengeStatus, string> = { on_track: 'var(--color-steps)', behind: 'var(--color-kcal)', won: 'var(--color-count)', out_of_reach: 'var(--color-muted)' };
 
 @Component({
   selector: 'app-challenges-card',
+  imports: [Meter],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'block' },
   template: `
-    <section class="card" [attr.aria-label]="group().title + ' challenges'">
+    <section class="tile h-full" [attr.aria-label]="group().title + ' challenges'">
       <p class="label mb-1 text-count">{{ group().emoji }} {{ group().title }} · challenges</p>
       @for (r of group().rows; track r.id) {
         <div class="mt-2">
           <div class="flex items-center justify-between text-sm">
             <span>{{ r.habitName }}</span>
-            <span><b>{{ r.progress.done }}</b>/{{ r.progress.target }} days
-              <span class="ml-1 rounded-md px-1.5 py-px text-[9px] font-extrabold" [class]="chips[r.progress.status].cls">{{ chips[r.progress.status].text }}</span></span>
+            <span><b>{{ r.progress.done }}</b>/{{ r.progress.target }} days <span class="chip ml-1" [attr.data-status]="r.progress.status">{{ chip[r.progress.status] }}</span></span>
           </div>
-          <div class="relative mt-1 h-1.5 rounded bg-raised">
-            <div class="h-full rounded" [style.width.%]="pct(r.progress)" [style.background]="chips[r.progress.status].bar"></div>
-            <span class="absolute -top-0.5 h-2.5 w-0.5 bg-white/70" [style.left.%]="r.progress.pace * 100" aria-hidden="true"></span>
-          </div>
+          <app-meter class="mt-1" [fraction]="ratio(r.progress)" [color]="bar[r.progress.status]" track="var(--color-raised)" [marker]="r.progress.pace" />
         </div>
       }
       <p class="muted mt-2">{{ group().footer }}</p>
@@ -4758,46 +5455,50 @@ const CHIPS: Record<ChallengeStatus, { text: string; cls: string; bar: string }>
 })
 export class ChallengesCard {
   readonly group = input.required<ChallengeGroupVm>();
-  protected readonly chips = CHIPS;
-  protected pct(p: ChallengeProgress): number {
-    return Math.min(100, (100 * p.done) / p.target);
+  protected readonly chip = CHIP_TEXT;
+  protected readonly bar = BAR;
+  protected ratio(p: ChallengeProgress): number {
+    return p.done / p.target;
   }
 }
 ```
 
-- [ ] **Step 7: The Perfect Day overlay**
+- [ ] **Step 8: The Perfect Day overlay**
 
 Create `src/app/features/shell/perfect-day.ts`:
 
 ```ts
-import { ChangeDetectionStrategy, Component, effect, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { storageGet, storageSet } from '../../core/storage';
+import { ThemeService } from '../../core/theme.service';
 import type { Day } from '../../domain/types';
 
 const KEY = 'perfect-day-shown';
-const COLORS = ['#ffd60a', '#ff375f', '#a3f53b', '#32d7fa', '#bf5af2', '#ff9f0a'];
+const BENTO = ['#ff3d8b', '#c8ff00', '#3d7bff', '#8b5cf6', '#ff7a1a', '#ffd60a'];
+const MATRIX = ['#ff3b30', '#f2f2f2'];
 
 @Component({
   selector: 'app-perfect-day',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
-    .confetti { position: absolute; top: -20px; border-radius: 2px; animation: fall 2.6s linear infinite; }
+    .confetti { position: absolute; top: -20px; animation: fall 2.6s linear infinite; }
     @keyframes fall { to { transform: translateY(110vh) rotate(540deg); } }
   `,
   template: `
     @if (visible()) {
       <div role="dialog" aria-modal="true" aria-label="Perfect Day"
-        class="fixed inset-0 z-40 grid place-items-center overflow-hidden bg-[radial-gradient(circle_at_50%_40%,#3a2a00_0%,#000_65%)] text-center">
-        @for (c of confetti; track $index) {
-          <span class="confetti" [style.left.%]="c.left" [style.background]="c.color" [style.animation-delay.ms]="c.delay" [style.width.px]="c.size" [style.height.px]="c.size * 1.8"></span>
+        class="fixed inset-0 z-40 grid place-items-center overflow-hidden bg-black/95 text-center">
+        @for (c of confetti(); track $index) {
+          <span class="confetti" [style.left.%]="c.left" [style.background]="c.color" [style.animation-delay.ms]="c.delay"
+            [style.width.px]="c.size" [style.height.px]="c.round ? c.size : c.size * 1.8" [style.border-radius]="c.round ? '50%' : '3px'"></span>
         }
         <div class="relative z-10 px-6">
           <div class="text-6xl">⭐</div>
-          <p class="mt-2 text-3xl font-black tracking-wide text-count">PERFECT DAY</p>
-          <p class="mt-1 text-sm text-[#d1d1d6]">All {{ rings() }} rings closed · <b>100</b>/100</p>
-          <p class="mx-auto mt-5 w-fit rounded-xl bg-[#3a2a10] px-4 py-1.5 text-base font-extrabold text-streak">🔥 {{ streak() }}-day streak</p>
+          <p class="num mt-3 text-5xl text-count">PERFECT DAY</p>
+          <p class="mt-2 text-sm">All {{ rings() }} rings closed · <b>100</b>/100</p>
+          <p class="mx-auto mt-5 w-fit rounded-full bg-raised px-4 py-1.5 text-base font-extrabold text-streak"><span class="flicker">🔥</span> {{ streak() }}-day streak</p>
           <p class="muted mt-3">Perfect Day #{{ countThisMonth() }} this month.<br />A gold ⭐ goes on today's spoke of the wheel.</p>
-          <button type="button" class="mt-6 rounded-xl bg-count px-6 py-2 text-sm font-bold text-black" (click)="visible.set(false)">Nice 🙌</button>
+          <button type="button" class="btn press mt-6" (click)="visible.set(false)">Nice 🙌</button>
         </div>
       </div>
     }
@@ -4809,10 +5510,15 @@ export class PerfectDay {
   readonly rings = input.required<number>();
   readonly streak = input.required<number>();
   readonly countThisMonth = input.required<number>();
+  private readonly theme = inject(ThemeService);
   protected readonly visible = signal(false);
-  protected readonly confetti = Array.from({ length: 60 }, (_, i) => ({
-    left: (i * 37) % 100, color: COLORS[i % COLORS.length], delay: (i * 97) % 2600, size: 4 + (i % 5),
-  }));
+  protected readonly confetti = computed(() => {
+    const matrix = this.theme.theme() === 'matrix';
+    const colors = matrix ? MATRIX : BENTO;
+    return Array.from({ length: 60 }, (_, i) => ({
+      left: (i * 37) % 100, color: colors[i % colors.length], delay: (i * 97) % 2600, size: 4 + (i % 5), round: matrix,
+    }));
+  });
 
   constructor() {
     effect(() => {
@@ -4825,61 +5531,74 @@ export class PerfectDay {
 }
 ```
 
-- [ ] **Step 8: The Today page and the overlay in the shell**
+- [ ] **Step 9: The Today page (bento grid) and the overlay in the shell**
 
 Replace `src/app/features/today/today.page.ts`:
 
 ```ts
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { AuthService } from '../../core/auth.service';
 import { Clock } from '../../core/clock';
-import { dayLabel } from '../../core/format';
+import { dayLabel, greetingName } from '../../core/format';
 import { Online } from '../../core/online';
+import { ThemeService } from '../../core/theme.service';
 import { TrackerStore } from '../../data/tracker.store';
+import { CaloriesTile } from './calories-tile';
 import { ChallengesCard } from './challenges-card';
 import { CountdownsCard } from './countdowns-card';
 import { FastingCard } from './fasting-card';
-import { RingsCard } from './rings-card';
 import { RoutinesCard } from './routines-card';
 import { ScoreCard } from './score-card';
+import { StepsTile } from './steps-tile';
 import { buildTodayVm } from './today.vm';
 import { WorkoutCard } from './workout-card';
 
 @Component({
   selector: 'app-today-page',
-  imports: [ScoreCard, CountdownsCard, FastingCard, RingsCard, WorkoutCard, RoutinesCard, ChallengesCard],
+  imports: [ScoreCard, CountdownsCard, FastingCard, StepsTile, CaloriesTile, WorkoutCard, RoutinesCard, ChallengesCard],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let v = vm();
-    <header class="mb-3 flex items-end justify-between px-1">
-      <div>
-        <p class="text-xs tracking-wide text-muted">{{ header() }}</p>
-        <h1 class="text-2xl font-extrabold">Let's go 🔥</h1>
+    <header class="mb-3 flex items-center justify-between gap-2 px-1">
+      <div class="min-w-0">
+        <p class="label text-muted">{{ header() }}</p>
+        <h1 class="num mt-1 truncate text-[28px]">let's get it{{ name() ? ', ' + name() : '' }}</h1>
       </div>
-      @if (isIos) {
-        <a href="shortcuts://run-shortcut?name=Countdown%20Sync" class="rounded-xl bg-[#10303a] px-3 py-1.5 text-xs font-semibold text-routine">↻ Sync iPhone</a>
-      }
+      <div class="flex shrink-0 items-center gap-2">
+        @if (isIos) {
+          <a href="shortcuts://run-shortcut?name=Countdown%20Sync" class="btn-quiet press !px-3 !py-2 text-xs">↻ Sync</a>
+        }
+        <button type="button" aria-label="Switch theme" (click)="theme.toggle()"
+          class="press grid size-10 place-items-center rounded-full bg-accent text-lg text-black
+                 matrix:rounded-xl matrix:border matrix:border-line matrix:bg-black matrix:text-white">◐</button>
+      </div>
     </header>
-    <div class="grid gap-2 lg:grid-cols-2">
+    <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <app-countdowns-card class="col-span-2" [tiles]="v.countdowns" />
       <app-score-card [score]="v.score" [perfect]="v.perfect" [streak]="v.streak" />
-      <app-countdowns-card [tiles]="v.countdowns" />
+      <app-steps-tile [steps]="v.steps" [goal]="v.stepGoal" [lastSyncAt]="v.lastSyncAt" [stale]="v.syncStale" />
       @if (v.fasting; as f) {
         <app-fasting-card [fasting]="f" />
       }
-      <app-rings-card [vm]="v" />
-      <app-workout-card [workouts]="v.workouts" [disabled]="!online()" (trained)="store.addManualWorkout()" (remove)="store.removeWorkout($event)" />
-      <app-routines-card [groups]="v.routines" [weekly]="v.weekly" [today]="v.today" [disabled]="!online()" (toggle)="store.toggleCheck($event, v.today)" />
+      <app-calories-tile [kcal]="v.kcal" [goal]="v.kcalGoal" />
+      <app-routines-card class="col-span-2" [groups]="v.routines" [weekly]="v.weekly" [today]="v.today" [done]="v.routinesDone" [total]="v.routinesTotal"
+        [disabled]="!online()" (toggle)="store.toggleCheck($event, v.today)" />
+      <app-workout-card class="col-span-2" [workouts]="v.workouts" [disabled]="!online()" (trained)="store.addManualWorkout()" (remove)="store.removeWorkout($event)" />
       @for (g of v.challengeGroups; track g.countdownId) {
-        <app-challenges-card [group]="g" />
+        <app-challenges-card class="col-span-2" [group]="g" />
       }
     </div>
   `,
 })
 export class TodayPage {
   protected readonly store = inject(TrackerStore);
+  protected readonly theme = inject(ThemeService);
   private readonly clock = inject(Clock);
+  private readonly auth = inject(AuthService);
   protected readonly online = inject(Online).online;
   protected readonly isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
   protected readonly header = computed(() => dayLabel(this.store.today()).toUpperCase());
+  protected readonly name = computed(() => greetingName(this.auth.email()));
   protected readonly vm = computed(() =>
     buildTodayVm({
       habits: this.store.habits(), countdowns: this.store.countdowns(), challenges: this.store.challenges(),
@@ -4889,17 +5608,16 @@ export class TodayPage {
 }
 ```
 
-In `src/app/features/shell/shell.ts`: add `PerfectDay` to `imports`; add these imports at the top:
+In `src/app/features/shell/shell.ts`: add `PerfectDay` to `imports`; add `computed` to the `@angular/core` import; add the imports
 
 ```ts
-import { computed } from '@angular/core';
 import { eachDay, monthStart } from '@shared/days';
 import { dayScore, isPerfect } from '../../domain/scoring';
 import { overallStreak } from '../../domain/streaks';
 import { PerfectDay } from './perfect-day';
 ```
 
-add the field:
+add the field
 
 ```ts
   protected readonly perfectInfo = computed(() => {
@@ -4922,28 +5640,29 @@ and append to the template, after `<app-toast />`:
     <app-perfect-day [perfect]="p.perfect" [today]="store.today()" [rings]="p.rings" [streak]="p.streak" [countThisMonth]="p.count" />
 ```
 
-- [ ] **Step 9: Run the tests to see them pass**
+- [ ] **Step 10: Run the tests to see them pass**
 
 Run: `npx ng test --watch=false`
-Expected: PASS — `today.vm.spec.ts` (6), `today-cards.spec.ts` (6), `perfect-day.spec.ts` (2), plus earlier suites.
+Expected: PASS — `today.vm.spec.ts` (6), `ui.spec.ts` (5), `today-cards.spec.ts` (7), `perfect-day.spec.ts` (2), plus earlier suites.
 
-- [ ] **Step 10: Browser check**
+- [ ] **Step 11: Browser check (both themes)**
 
-`npx ng serve`; sign in as the test user; phone-sized window. Expected on `/today`:
-- header with today's date
-- score card at 0–something with 🔥 streak and ❄️ chip
-- Diwali + Engagement tiles with the right day counts
-- the fasting card (a "Fasting" or "Eating window" state matching your clock)
-- rings at 0 / 10k steps and 0 / 2,000 kcal, "Steps not synced yet" in amber
-- "Trained today ✓" button; routines grouped Morning / Night with Dermarolling's weekly line
+`npx ng serve`; sign in as the test user; phone-sized window. In DevTools console, `localStorage.setItem('theme-pref','bento')` and reload. Expected on `/today`, in **Bento**:
+- header "let's get it, You" with ◐; a pink countdown tile across the top (Diwali big, Engagement on the right) that counts up when the page opens
+- lime score tile with a black ring that fills in; blue steps tile ("not synced yet"); violet fasting tile matching your clock; orange calories tile linking to Food
+- routines as pills; workout tile with "Trained today ✓"
 
-Tap "AM skincare": its circle fills and the routines count goes up, and both stay after a reload. Tap "Trained today ✓" → "💪 Trained ✓ Remove". Tick every routine and add a workout → the score goes up but not to 100 (steps/calories/fasting aren't done) — the overlay must not appear. Desktop width: cards in two columns. Stop the server.
+Tap AM skincare: the pill turns lime and pops, and the count reads 1/4; it stays after a reload. Tap ◐: everything crossfades to **Matrix**:
+- bordered black boxes, Doto dot-matrix numbers and Space Mono text
+- dotted rings and dot bars; ●/○ routine ticks; uppercase tab words
 
-- [ ] **Step 11: Commit**
+Set the pref to `auto` and reload: the theme matches the time (Bento 6 AM–7 PM). With DevTools → Rendering → "prefers-reduced-motion: reduce", reload: numbers appear at once and nothing animates. Desktop width: tiles flow into four columns. Stop the server.
+
+- [ ] **Step 12: Commit**
 
 ```bash
-git add src/app/core/storage.ts src/app/features/today src/app/features/shell
-git commit -m "Add Today screen, game cards and Perfect Day overlay" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git add src/app/ui src/app/features/today src/app/features/shell
+git commit -m "Add bento Today screen, theme-aware ring/meter/count-up, and Perfect Day overlay" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -5053,6 +5772,7 @@ Create `src/app/features/habits/habits-cards.spec.ts`:
 ```ts
 import { TestBed } from '@angular/core/testing';
 import { ctx, habit, history } from '../../domain/testing';
+import { ThemeService } from '../../core/theme.service';
 import { TrackerApi } from '../../data/tracker-api';
 import { HabitGrid } from './habit-grid';
 import { HabitWheel } from './habit-wheel';
@@ -5069,6 +5789,18 @@ const settle = async (f: { whenStable(): Promise<unknown> }) => {
 const matrix = buildMonthMatrix(habits, '2026-10-19', ctx('2026-10-19', history({ checks: { a: ['2026-10-01', '2026-10-02'] }, steps: { '2026-10-01': 12000 } })), new Set());
 
 describe('Habits cards', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('HabitWheel draws off-white dots and a red star in Matrix', async () => {
+    TestBed.inject(ThemeService).setPref('matrix');
+    const fixture = TestBed.createComponent(HabitWheel);
+    fixture.componentRef.setInput('matrix', matrix);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    expect([...el.querySelectorAll('circle')].every((c) => c.getAttribute('fill') === '#f2f2f2')).toBe(true);
+    expect([...el.querySelectorAll('text')].find((x) => x.textContent === '★')?.getAttribute('fill')).toBe('#ff3b30');
+  });
+
   it('HabitWheel draws one dot per done day, stars perfect days and marks auto habits', async () => {
     const fixture = TestBed.createComponent(HabitWheel);
     fixture.componentRef.setInput('matrix', matrix);
@@ -5235,10 +5967,17 @@ export function dotRadius(r: number, days: number): number {
 Create `src/app/features/habits/habit-wheel.ts`:
 
 ```ts
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { monthLabel } from '../../core/format';
+import { ThemeService } from '../../core/theme.service';
 import type { MonthMatrix } from './month-matrix';
 import { arcPath, dayAngle, dotRadius, polar, ringMid, ringWidth, wedgePath, WHEEL } from './wheel-geometry';
+
+// SVG colours per theme: Bento keeps each habit's colour; Matrix draws off-white dots with red highlights.
+const INK = {
+  bento: { wedge: '#1f2d10', line: '#2c2c2e', label: '#d1d1d6', muted: '#8e8e93', today: '#c8ff00', star: '#ffd60a', centre: '#ffffff', dot: null as string | null },
+  matrix: { wedge: '#1a0806', line: '#1f1f1f', label: '#bdbdbd', muted: '#8a8a8a', today: '#ff3b30', star: '#ff3b30', centre: '#f2f2f2', dot: '#f2f2f2' as string | null },
+};
 
 @Component({
   selector: 'app-habit-wheel',
@@ -5246,27 +5985,27 @@ import { arcPath, dayAngle, dotRadius, polar, ringMid, ringWidth, wedgePath, WHE
   template: `
     <svg viewBox="0 0 320 320" class="w-full" role="img" [attr.aria-label]="'Habit wheel for ' + title()">
       @if (todayWedge(); as w) {
-        <path [attr.d]="w" fill="#1f2d10" />
+        <path [attr.d]="w" [attr.fill]="ink().wedge" />
       }
-      <path [attr.d]="band" fill="none" stroke="#2c2c2e" stroke-width="13" />
+      <path [attr.d]="band" fill="none" [attr.stroke]="ink().line" stroke-width="13" />
       @for (d of dayLabels(); track d.key) {
         <text [attr.x]="d.x" [attr.y]="d.y + 2.5" text-anchor="middle" font-size="6.5" [attr.fill]="d.fill" [attr.font-weight]="d.bold ? 800 : 500">{{ d.text }}</text>
       }
       @for (r of ringLines(); track $index) {
-        <path [attr.d]="r" fill="none" stroke="#2c2c2e" stroke-width="0.8" />
+        <path [attr.d]="r" fill="none" [attr.stroke]="ink().line" stroke-width="0.8" />
       }
       @for (s of spokes(); track $index) {
-        <line [attr.x1]="s[0]" [attr.y1]="s[1]" [attr.x2]="s[2]" [attr.y2]="s[3]" stroke="#2c2c2e" stroke-width="0.8" />
+        <line [attr.x1]="s[0]" [attr.y1]="s[1]" [attr.x2]="s[2]" [attr.y2]="s[3]" [attr.stroke]="ink().line" stroke-width="0.8" />
       }
       @for (dot of dots(); track dot.key) {
         <circle [attr.cx]="dot.x" [attr.cy]="dot.y" [attr.r]="dot.r" [attr.fill]="dot.color" />
       }
       @for (l of labels(); track l.key) {
-        <line x1="6" [attr.y1]="l.y + 4" [attr.x2]="cx - 2" [attr.y2]="l.y + 4" stroke="#2c2c2e" stroke-width="0.6" />
-        <text [attr.x]="cx - 6" [attr.y]="l.y + 2.5" text-anchor="end" font-size="8.5" fill="#d1d1d6">{{ l.text }}</text>
+        <line x1="6" [attr.y1]="l.y + 4" [attr.x2]="cx - 2" [attr.y2]="l.y + 4" [attr.stroke]="ink().line" stroke-width="0.6" />
+        <text [attr.x]="cx - 6" [attr.y]="l.y + 2.5" text-anchor="end" font-size="8.5" [attr.fill]="ink().label">{{ l.text }}</text>
       }
-      <text [attr.x]="cx + 14" [attr.y]="cy + 4" text-anchor="middle" font-size="20" font-weight="900" fill="#fff">{{ shortMonth() }}</text>
-      <text [attr.x]="cx + 14" [attr.y]="cy + 16" text-anchor="middle" font-size="7" fill="#8e8e93">⚡ = fills automatically</text>
+      <text [attr.x]="cx + 14" [attr.y]="cy + 4" text-anchor="middle" font-size="20" font-weight="900" class="num" [attr.fill]="ink().centre">{{ shortMonth() }}</text>
+      <text [attr.x]="cx + 14" [attr.y]="cy + 16" text-anchor="middle" font-size="7" [attr.fill]="ink().muted">⚡ = fills automatically</text>
     </svg>
     @if (matrix().rows.length === 0) {
       <p class="muted text-center">No daily habits this month.</p>
@@ -5275,6 +6014,8 @@ import { arcPath, dayAngle, dotRadius, polar, ringMid, ringWidth, wedgePath, WHE
 })
 export class HabitWheel {
   readonly matrix = input.required<MonthMatrix>();
+  private readonly theme = inject(ThemeService);
+  protected readonly ink = computed(() => INK[this.theme.theme()]);
   protected readonly cx = WHEEL.cx;
   protected readonly cy = WHEEL.cy;
   protected readonly band = arcPath(WHEEL.outer + 8, 0, WHEEL.span);
@@ -5294,7 +6035,7 @@ export class HabitWheel {
     return m.days.map((day, i) => {
       const [x, y] = polar(WHEEL.outer + 8, dayAngle(i, m.days.length));
       const today = i === m.todayIndex;
-      return { key: day, x, y, text: m.perfect[i] ? '★' : String(i + 1), bold: today || m.perfect[i], fill: m.perfect[i] ? '#ffd60a' : today ? '#a3f53b' : '#8e8e93' };
+      return { key: day, x, y, text: m.perfect[i] ? '★' : String(i + 1), bold: today || m.perfect[i], fill: m.perfect[i] ? this.ink().star : today ? this.ink().today : this.ink().muted };
     });
   });
 
@@ -5314,7 +6055,7 @@ export class HabitWheel {
       return row.done.flatMap((done, j) => {
         if (!done) return [];
         const [x, y] = polar(r, dayAngle(j, m.days.length));
-        return [{ key: `${row.habit.id}-${j}`, x, y, r: dotRadius(r, m.days.length), color: row.habit.color }];
+        return [{ key: `${row.habit.id}-${j}`, x, y, r: dotRadius(r, m.days.length), color: this.ink().dot ?? row.habit.color }];
       });
     });
   });
@@ -5333,7 +6074,8 @@ export class HabitWheel {
 Create `src/app/features/habits/habit-grid.ts`:
 
 ```ts
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import { ThemeService } from '../../core/theme.service';
 import { isActiveOn } from '../../domain/visibility';
 import type { Day, Habit } from '../../domain/types';
 import type { MonthMatrix } from './month-matrix';
@@ -5360,13 +6102,13 @@ import type { MonthMatrix } from './month-matrix';
             <tr>
               <th class="sticky left-0 z-10 max-w-28 truncate bg-card py-1 pr-2 text-left font-normal">{{ row.habit.name }}{{ row.habit.source === 'manual' ? '' : ' ⚡' }}</th>
               @for (d of m.days; track d; let i = $index) {
-                <td class="text-center" [style.background]="i === m.todayIndex ? '#1f2d10' : null">
+                <td class="text-center" [style.background]="i === m.todayIndex ? todayTint() : null">
                   @if (tappable(row.habit, d)) {
                     <button type="button" class="size-6" [attr.aria-label]="row.habit.name + ' on ' + d" [attr.aria-pressed]="row.done[i]" [disabled]="disabled()" (click)="toggle.emit({ habitId: row.habit.id, day: d })">
-                      <span class="inline-block size-3 rounded-full" [style.background]="row.done[i] ? row.habit.color : 'transparent'" [style.border]="row.done[i] ? 'none' : '1px solid #48484a'"></span>
+                      <span class="inline-block size-3 rounded-full" [style.background]="row.done[i] ? dotColor(row.habit) : 'transparent'" [style.border]="row.done[i] ? 'none' : '1px solid #48484a'"></span>
                     </button>
                   } @else {
-                    <span class="inline-block size-3 rounded-full" [style.background]="row.done[i] ? row.habit.color : 'transparent'" [style.border]="row.done[i] ? 'none' : d <= today() ? '1px solid #3a3a3c' : '1px solid #1c1c1e'"></span>
+                    <span class="inline-block size-3 rounded-full" [style.background]="row.done[i] ? dotColor(row.habit) : 'transparent'" [style.border]="row.done[i] ? 'none' : d <= today() ? '1px solid #3a3a3c' : '1px solid #1c1c1e'"></span>
                   }
                 </td>
               }
@@ -5378,7 +6120,7 @@ import type { MonthMatrix } from './month-matrix';
     <div class="mt-2 space-y-0.5 px-1">
       @for (row of m.rows; track row.habit.id) {
         <p class="flex justify-between gap-2 text-xs">
-          <span><span class="mr-1 inline-block size-2 rounded-full" [style.background]="row.habit.color"></span>{{ row.habit.name }}</span>
+          <span><span class="mr-1 inline-block size-2 rounded-full" [style.background]="dotColor(row.habit)"></span>{{ row.habit.name }}</span>
           <span><b>{{ row.doneCount }}/{{ row.elapsed }}</b> days · best streak {{ row.bestStreak }}</span>
         </p>
       }
@@ -5387,6 +6129,13 @@ import type { MonthMatrix } from './month-matrix';
 })
 export class HabitGrid {
   readonly matrix = input.required<MonthMatrix>();
+  private readonly theme = inject(ThemeService);
+  private readonly isMatrix = computed(() => this.theme.theme() === 'matrix');
+  protected readonly todayTint = computed(() => (this.isMatrix() ? '#1a0806' : '#1f2d10'));
+
+  protected dotColor(h: Habit): string {
+    return this.isMatrix() ? '#f2f2f2' : h.color;
+  }
   readonly today = input.required<Day>();
   readonly disabled = input(false);
   readonly toggle = output<{ habitId: string; day: Day }>();
@@ -5623,7 +6372,7 @@ export class HabitsPage {
 - [ ] **Step 6: Run the tests to see them pass**
 
 Run: `npx ng test --watch=false`
-Expected: PASS — `month-matrix.spec.ts` (5), `wheel-geometry.spec.ts` (4), `habits-cards.spec.ts` (3), plus earlier suites.
+Expected: PASS — `month-matrix.spec.ts` (5), `wheel-geometry.spec.ts` (4), `habits-cards.spec.ts` (4), plus earlier suites.
 
 - [ ] **Step 7: Browser check**
 
@@ -5633,6 +6382,7 @@ Expected: PASS — `month-matrix.spec.ts` (5), `wheel-geometry.spec.ts` (4), `ha
 - Weekly card shows W1–W5 for Dermarolling
 - add a one-off "Haircut before Diwali", tick it (strikes through), delete it (two taps)
 - the ‹ arrow is disabled in the first month; › is disabled in the current month
+- ◐ on Today, then back to Habits: in **Matrix** the wheel dots are all off-white, today and ⭐ days are red, and the Grid dots are off-white
 
 Desktop width: wheel left, weekly + one-offs right. Stop the server.
 
@@ -5847,10 +6597,12 @@ import { SAVE_FAILED, ToastService } from '../../core/toast.service';
 import type { FoodEntryRow, SavedFoodRow } from '../../data/rows';
 import { TrackerApi } from '../../data/tracker-api';
 import { TrackerStore } from '../../data/tracker.store';
+import { Meter } from '../../ui/meter';
 import { defaultTime, foodLines, parseFood, suggest, totals, type FoodLine } from './food-day';
 
 @Component({
   selector: 'app-food-page',
+  imports: [Meter],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="mb-2 flex items-center justify-between px-1">
@@ -5865,10 +6617,10 @@ import { defaultTime, foodLines, parseFood, suggest, totals, type FoodLine } fro
     <div class="grid gap-2 lg:grid-cols-2">
       <section class="card" aria-label="Calories">
         <div class="flex items-baseline justify-between">
-          <p><span class="text-3xl font-black text-kcal" data-testid="kcal-total">{{ n(total().kcal) }}</span> <span class="muted">/ {{ n(goal()) }} kcal</span></p>
+          <p><span class="num text-4xl text-kcal" data-testid="kcal-total">{{ n(total().kcal) }}</span> <span class="muted">/ {{ n(goal()) }} kcal</span></p>
           <p class="text-sm font-bold" [class.text-kcal]="total().kcal > goal()">{{ total().kcal > goal() ? n(total().kcal - goal()) + ' over' : n(goal() - total().kcal) + ' left' }}</p>
         </div>
-        <div class="mt-1.5 h-2 rounded bg-[#3a1a22]"><div class="h-full rounded bg-kcal" [style.width.%]="barPct()"></div></div>
+        <app-meter class="mt-1.5" [fraction]="total().kcal / goal()" color="var(--color-kcal)" track="var(--color-raised)" />
         @if (total().protein !== null) {
           <p class="muted mt-1">Protein {{ total().protein }} g</p>
         }
@@ -5958,7 +6710,6 @@ export class FoodPage {
 
   protected readonly goal = computed(() => this.store.goals().kcalGoal);
   protected readonly total = computed(() => totals(this.entries()));
-  protected readonly barPct = computed(() => Math.min(100, (100 * this.total().kcal) / this.goal()));
   protected readonly lines = computed(() => foodLines(this.entries(), this.store.goals()));
   protected readonly chips = computed(() => suggest(this.saved(), this.query()));
   protected readonly defaultTime = computed(() => defaultTime(this.day(), this.store.today(), this.clock.instant()));
@@ -6104,7 +6855,7 @@ git commit -m "Add Food screen with quick add, saved foods, time field and fasti
 
 **Files:**
 - Create: `src/app/features/settings/settings-forms.ts`, `settings-forms.spec.ts`
-- Create: `src/app/features/settings/countdowns-section.ts`, `habits-section.ts`, `targets-section.ts`, `fasting-section.ts`, `shortcut-section.ts`, `settings-sections.spec.ts`
+- Create: `src/app/features/settings/countdowns-section.ts`, `habits-section.ts`, `targets-section.ts`, `fasting-section.ts`, `shortcut-section.ts`, `appearance-section.ts`, `settings-sections.spec.ts`
 - Modify: `src/app/features/settings/settings.page.ts` (replace stub)
 
 **Interfaces:**
@@ -6163,6 +6914,7 @@ import { DEFAULT_GOALS } from '../../domain/types';
 import { TrackerApi } from '../../data/tracker-api';
 import { FastingSection } from './fasting-section';
 import { ShortcutSection } from './shortcut-section';
+import { AppearanceSection } from './appearance-section';
 
 const settle = async (f: { whenStable(): Promise<unknown> }) => {
   await f.whenStable();
@@ -6218,7 +6970,23 @@ describe('Settings sections', () => {
     await settle(fixture);
     expect(writeText).toHaveBeenCalledWith('abc123');
   });
+
+  it('AppearanceSection switches the theme preference and applies it', async () => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ providers: [{ provide: TrackerApi, useValue: fakeApi() }] });
+    const fixture = TestBed.createComponent(AppearanceSection);
+    await settle(fixture);
+    const el = fixture.nativeElement as HTMLElement;
+    const radio = (name: string) => [...el.querySelectorAll('[role=radio]')].find((b) => b.textContent?.trim() === name) as HTMLButtonElement;
+    expect(radio('Auto').getAttribute('aria-checked')).toBe('true');
+    radio('Matrix').click();
+    await settle(fixture);
+    expect(radio('Matrix').getAttribute('aria-checked')).toBe('true');
+    expect(document.documentElement.dataset['theme']).toBe('matrix');
+    expect(localStorage.getItem('theme-pref')).toBe('matrix');
+  });
 });
+
 ```
 
 - [ ] **Step 2: Run them to see them fail**
@@ -6829,6 +7597,39 @@ export class ShortcutSection {
 
 (`fakeApi` in the spec returns `hasToken: true` from `loadConfig`, but the store only reads that on `reloadConfig()`, so before the first tap `hasToken()` is still `false` and the button says "Generate token" — exactly the first-time path. The confirm-tap path is covered by Playwright in Task 15.)
 
+Create `src/app/features/settings/appearance-section.ts`:
+
+```ts
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import type { ThemePref } from '../../core/theme';
+import { ThemeService } from '../../core/theme.service';
+
+@Component({
+  selector: 'app-appearance-section',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <section class="tile" aria-label="Appearance">
+      <p class="label mb-2">Appearance</p>
+      <div class="flex gap-1 rounded-full bg-raised p-1 text-sm font-bold matrix:rounded-xl" role="radiogroup" aria-label="Theme">
+        @for (o of options; track o.id) {
+          <button type="button" role="radio" class="press flex-1 rounded-full py-1.5 matrix:rounded-lg" [attr.aria-checked]="theme.pref() === o.id"
+            [class]="theme.pref() === o.id ? 'bg-accent text-black' : 'text-muted'" (click)="theme.setPref(o.id)">{{ o.label }}</button>
+        }
+      </div>
+      <p class="muted mt-2">Auto uses Bento from 6 AM and Matrix from 7 PM; the ◐ button on Today overrides it until the next switch. Saved on this device.</p>
+    </section>
+  `,
+})
+export class AppearanceSection {
+  protected readonly theme = inject(ThemeService);
+  protected readonly options: { id: ThemePref; label: string }[] = [
+    { id: 'auto', label: 'Auto' },
+    { id: 'bento', label: 'Bento' },
+    { id: 'matrix', label: 'Matrix' },
+  ];
+}
+```
+
 - [ ] **Step 7: The Settings page**
 
 Replace `src/app/features/settings/settings.page.ts`:
@@ -6836,6 +7637,7 @@ Replace `src/app/features/settings/settings.page.ts`:
 ```ts
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { AuthService } from '../../core/auth.service';
+import { AppearanceSection } from './appearance-section';
 import { CountdownsSection } from './countdowns-section';
 import { FastingSection } from './fasting-section';
 import { HabitsSection } from './habits-section';
@@ -6844,7 +7646,7 @@ import { TargetsSection } from './targets-section';
 
 @Component({
   selector: 'app-settings-page',
-  imports: [CountdownsSection, HabitsSection, TargetsSection, FastingSection, ShortcutSection],
+  imports: [AppearanceSection, CountdownsSection, HabitsSection, TargetsSection, FastingSection, ShortcutSection],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h1 class="mb-3 px-1 text-2xl font-extrabold">Settings</h1>
@@ -6854,6 +7656,7 @@ import { TargetsSection } from './targets-section';
       <app-targets-section />
       <app-fasting-section />
       <app-shortcut-section />
+      <app-appearance-section />
       <section class="card" aria-label="Account">
         <p class="label mb-1 text-muted">Account</p>
         <p class="flex items-center justify-between gap-2 text-sm">
@@ -6872,7 +7675,7 @@ export class SettingsPage {
 - [ ] **Step 8: Run the tests to see them pass**
 
 Run: `npx ng test --watch=false`
-Expected: PASS — `settings-forms.spec.ts` (5), `settings-sections.spec.ts` (2), plus earlier suites.
+Expected: PASS — `settings-forms.spec.ts` (5), `settings-sections.spec.ts` (3), plus earlier suites.
 
 - [ ] **Step 9: Browser check**
 
@@ -6882,6 +7685,7 @@ Expected: PASS — `settings-forms.spec.ts` (5), `settings-sections.spec.ts` (2)
 - **Targets:** 500 steps → "Step goal must be 1,000–100,000"; 12000 → Saved, and the Today steps ring shows "/ 12k".
 - **Fasting:** set window 2 to 00:30–13:00 → "Windows can't overlap"; set it back to 11:00–13:00 → Saved. Switch fasting off → the Today fasting card disappears and the wheel loses "Fasting windows kept". Switch it on → both return.
 - **Shortcut:** Generate token → a 64-character token with Copy; the button now says "Rotate token" and needs a second tap.
+- **Appearance:** Matrix → the whole app switches at once; Auto → it follows the clock again.
 - **Account:** Sign out → `/login`.
 
 Stop the server.
@@ -6967,22 +7771,24 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
 import { dayLabel, dayRange, formatCompact } from '../../core/format';
 import type { ReportCard } from '../../domain/report';
 import type { Day } from '../../domain/types';
+import { Meter } from '../../ui/meter';
 
 @Component({
   selector: 'app-report-view',
+  imports: [Meter],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let r = report();
     <div class="text-center">
       <p class="text-xs font-bold tracking-wide text-count">{{ headline() }}</p>
-      <h1 class="mt-0.5 text-xl font-black">{{ r.countdown.title }} report card</h1>
+      <h1 class="num mt-1 text-3xl">{{ r.countdown.title }} report card</h1>
       <p class="muted">{{ range(r.from, r.to) }} · {{ r.days }} days</p>
     </div>
     @if (r.days === 0) {
       <p class="card muted mt-3 text-center">Nothing to report — this countdown started today.</p>
     } @else {
-      <section class="card mt-3 flex items-center gap-3 bg-gradient-to-br from-[#3a2a00] to-card">
-        <p class="w-14 text-center text-5xl font-black text-count" data-testid="grade">{{ r.grade }}</p>
+      <section class="tile mt-3 flex items-center gap-3" data-tone="lime">
+        <p class="num w-16 text-center text-6xl" data-testid="grade">{{ r.grade }}</p>
         <div>
           <p class="text-sm font-bold">Average score {{ r.avgScore }}</p>
           @if (r.bestWeek; as w) {
@@ -6992,8 +7798,8 @@ import type { Day } from '../../domain/types';
       </section>
       <div class="mt-2 grid grid-cols-3 gap-1.5">
         @for (s of stats(); track s.label) {
-          <div class="rounded-xl bg-card p-2 text-center">
-            <b class="block text-xl font-black leading-tight" [style.color]="s.color">{{ s.value }}</b>
+          <div class="tile !p-2 text-center">
+            <b class="num block text-2xl" [style.color]="s.color">{{ s.value }}</b>
             <span class="muted">{{ s.label }}</span>
           </div>
         }
@@ -7005,7 +7811,7 @@ import type { Day } from '../../domain/types';
             <p class="flex items-center justify-between py-0.5 text-sm">
               <span>{{ c.won ? '🏆' : '✕' }} {{ c.habitName }}</span>
               <span><b>{{ c.done }}</b>/{{ c.target }}
-                <span class="ml-1 rounded-md px-1.5 py-px text-[9px] font-extrabold" [class]="c.won ? 'bg-[#3a2a00] text-count' : 'bg-raised text-muted'">{{ c.won ? 'WON' : 'missed' }}</span></span>
+                <span class="chip ml-1" [attr.data-status]="c.won ? 'won' : 'missed'">{{ c.won ? 'WON' : 'missed' }}</span></span>
             </p>
           }
         </section>
@@ -7015,7 +7821,7 @@ import type { Day } from '../../domain/types';
           <p class="label mb-1 text-routine">Habits</p>
           @for (h of r.habits; track h.id) {
             <p class="flex justify-between text-sm"><span>{{ h.name }}</span><span>{{ h.percent }}%</span></p>
-            <div class="mb-1.5 mt-0.5 h-1.5 rounded bg-raised"><div class="h-full rounded" [style.width.%]="h.percent" [style.background]="h.color"></div></div>
+            <app-meter class="mb-1.5 mt-0.5" [fraction]="h.percent / 100" [color]="h.color" track="var(--color-raised)" />
           }
         </section>
       }
@@ -7036,12 +7842,12 @@ export class ReportView {
   protected readonly stats = computed(() => {
     const r = this.report();
     return [
-      { label: '⭐ Perfect', value: String(r.perfectDays), color: '#ffd60a' },
-      { label: '🔥 best streak', value: String(r.bestStreak), color: '#ff9f0a' },
-      { label: '💪 workouts', value: String(r.workoutDays), color: '#a3f53b' },
-      { label: 'steps', value: formatCompact(r.totalSteps), color: '#a3f53b' },
-      { label: 'steps/day', value: formatCompact(r.avgSteps), color: '#a3f53b' },
-      { label: 'kcal on target', value: String(r.kcalDays), color: '#ff375f' },
+      { label: '⭐ Perfect', value: String(r.perfectDays), color: 'var(--color-count)' },
+      { label: '🔥 best streak', value: String(r.bestStreak), color: 'var(--color-streak)' },
+      { label: '💪 workouts', value: String(r.workoutDays), color: 'var(--color-steps)' },
+      { label: 'steps', value: formatCompact(r.totalSteps), color: 'var(--color-steps)' },
+      { label: 'steps/day', value: formatCompact(r.avgSteps), color: 'var(--color-steps)' },
+      { label: 'kcal on target', value: String(r.kcalDays), color: 'var(--color-kcal)' },
     ];
   });
 }
@@ -7107,7 +7913,7 @@ git commit -m "Add report card screen" -m "Co-Authored-By: Claude Opus 5.5 <nore
 ### Task 15: Live test harness — Playwright end-to-end, live functions, security
 
 **Files:**
-- Create: `playwright.config.ts`, `e2e/helpers.ts`, `e2e/auth.spec.ts`, `e2e/today.spec.ts`, `e2e/food.spec.ts`, `e2e/fasting.spec.ts`, `e2e/rollover.spec.ts`, `e2e/countdown.spec.ts`, `e2e/offline.spec.ts`, `e2e/errors.spec.ts`
+- Create: `playwright.config.ts`, `e2e/helpers.ts`, `e2e/auth.spec.ts`, `e2e/today.spec.ts`, `e2e/food.spec.ts`, `e2e/fasting.spec.ts`, `e2e/rollover.spec.ts`, `e2e/countdown.spec.ts`, `e2e/offline.spec.ts`, `e2e/errors.spec.ts`, `e2e/theme.spec.ts`
 - Create: `scripts/live/security-check.mjs`, `scripts/live/functions-check.mjs`, `.github/workflows/live-tests.yml`
 - Modify: `package.json` (devDependency + scripts), `.gitignore`, `tsconfig.json` (exclude `e2e/` from the Angular build is automatic — `tsconfig.app.json` only includes `src/`)
 
@@ -7456,7 +8262,7 @@ test('ticking routines updates the score, rings and wheel, and survives a reload
   await expect(am).toHaveAttribute('aria-checked', 'false');
   await am.click();
   await expect(am).toHaveAttribute('aria-checked', 'true');
-  await expect(page.getByLabel('Rings')).toContainText('1 / 4 routines');
+  await expect(page.getByLabel('Routines')).toContainText('1/4');
   await page.getByRole('button', { name: 'Trained today ✓' }).click();
   await expect(page.getByLabel('Workout')).toContainText('Trained');
   await expect(page.getByLabel("Today's score")).toContainText('2 of 8 done');
@@ -7526,13 +8332,14 @@ test.beforeEach(resetTestUser);
 test('fasting card at 2 PM, eating window at 11:30 AM', async ({ page }) => {
   await pinClock(page, today(), '14:00');
   await login(page);
-  await expect(page.getByLabel('Fasting')).toContainText('🌙 Fasting · 1h done');
-  await expect(page.getByLabel('Fasting')).toContainText('next window 12:00 AM in 10h');
+  await expect(page.getByLabel('Fasting')).toContainText('🌙 Fasting');
+  await expect(page.getByLabel('Fasting')).toContainText('opens 12:00 AM · in 10h');
 
   await pinClock(page, today(), '11:30');
   await page.reload();
   await expect(page.getByLabel('Fasting')).toContainText('🍽️ Eating window');
-  await expect(page.getByLabel('Fasting')).toContainText('closes 1:00 PM · 1h 30m left');
+  await expect(page.getByLabel('Fasting')).toContainText('1h 30m');
+  await expect(page.getByLabel('Fasting')).toContainText('left · closes 1:00 PM');
 });
 
 test('windows are validated and saved', async ({ page }) => {
@@ -7634,6 +8441,39 @@ test('going offline shows the banner and disables ticking', async ({ page, conte
 });
 ```
 
+Create `e2e/theme.spec.ts`:
+
+```ts
+import { expect, test } from '@playwright/test';
+import { login, pinClock, resetTestUser, today } from './helpers';
+
+test.beforeEach(resetTestUser);
+
+test('Auto picks Bento by day; ◐ overrides it and the override survives a reload', async ({ page }) => {
+  await pinClock(page, today(), '14:00');
+  await login(page);
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'bento');
+  await expect(page.getByLabel("Today's score")).toHaveAttribute('data-tone', 'lime');
+
+  await page.getByRole('button', { name: 'Switch theme' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'matrix');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'matrix');
+});
+
+test('Auto picks Matrix at night, and Settings can pin a theme', async ({ page }) => {
+  await pinClock(page, today(), '20:00');
+  await login(page);
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'matrix');
+
+  await page.getByRole('link', { name: /Settings/ }).click();
+  await page.getByRole('radio', { name: 'Bento' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'bento');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'bento');
+});
+```
+
 Create `e2e/errors.spec.ts`:
 
 ```ts
@@ -7661,7 +8501,7 @@ test('a failed data load shows Retry, and Retry recovers', async ({ page }) => {
 - [ ] **Step 6: Run the end-to-end suite**
 
 Run: `npm run test:e2e`
-Expected: 10 tests × 2 projects (phone, desktop) = **20 passed**. If a selector misses, run `npx playwright test --headed --project=phone e2e/<file>` to watch it, fix the selector or the bug it found, and re-run. Do not loosen an assertion to make it pass.
+Expected: 12 tests × 2 projects (phone, desktop) = **24 passed**. If a selector misses, run `npx playwright test --headed --project=phone e2e/<file>` to watch it, fix the selector or the bug it found, and re-run. Do not loosen an assertion to make it pass.
 
 - [ ] **Step 7: Manual GitHub workflow for the live suite**
 
@@ -7827,6 +8667,11 @@ Run on the iPhone after setup. Tick each case; note anything that doesn't match 
 | 12b | Guard — old token | Rotate the token in Settings but don't update Food Guard; open a food app | Notification "Food Guard couldn't check: Token not recognised…"; the app stays open. Paste the new token → case 8 works again |
 | 12c | Sync — failure mid-run | Airplane mode on, run Countdown Sync | "Countdown sync failed: …" and the Shortcut stops; airplane mode off, run again → steps appear, nothing duplicated |
 | 16 | Sign out | Settings → Sign out, then reopen the app | Login screen; none of your data is visible until you sign in again |
+| 17 | Theme — Auto | Open the app at ~6:55 PM, then again after 7:00 PM | Bento colour tiles before 7 PM; Matrix dot-matrix look after (and back to Bento after 6 AM) |
+| 18 | Theme — ◐ | In the afternoon tap ◐ | Crossfades to Matrix; still Matrix after closing/reopening; back to Auto (Bento/Matrix by clock) after the next 7 PM / 6 AM |
+| 19 | Theme — Settings | Settings → Appearance → Bento | Stays Bento at night too |
+| 20 | Reduce Motion | iOS Settings → Accessibility → Motion → Reduce Motion on, open the app | Numbers appear instantly; no ring fills, pops or flicker; theme switches without a crossfade |
+| 21 | Fonts offline | Airplane mode, reopen the app | The "connect to load" screen still uses Space Grotesk (Bento) / Space Mono + Doto (Matrix), not a system font |
 | 13 | 4 AM rollover | Tick a routine at ~1 AM; check again after 4 AM | At 1 AM it counts for the previous day; after 4 AM Today shows the new date with routines unticked |
 | 14 | Perfect Day | Close every ring in a day | Confetti overlay once; not again after reopening the app that day |
 | 15 | Report card | On a countdown's date, open Today | "Today! 🪔" with "See your report card →"; the card shows a grade and stats |
@@ -7871,7 +8716,7 @@ npx ng build --base-href /countdown-tracker/
 npm run test:live
 ```
 
-Expected: all unit/component suites pass; 37 function tests pass; the build completes without errors (budget warnings are acceptable, errors are not); `setup-check passed`, `security-check passed`, `functions-check passed`, and 20 Playwright tests pass.
+Expected: all unit/component suites pass; 37 function tests pass; the build completes without errors (budget warnings are acceptable, errors are not); `setup-check passed`, `security-check passed`, `functions-check passed`, and 24 Playwright tests pass.
 
 - [ ] **Step 5: Commit, push, verify the deployment**
 

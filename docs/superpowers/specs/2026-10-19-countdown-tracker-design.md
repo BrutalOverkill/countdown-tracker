@@ -26,7 +26,7 @@ A personal tracker for Anvit, used on the iPhone (installed to the home screen) 
 | Workouts | From the **Strong** app via Apple Health, session level only (trained? which, how long); fallback one-tap "trained ✓" | chose (Q4) |
 | Skincare / hair | Habits: AM skincare, PM skincare, Minoxidil AM, Minoxidil PM (daily); Dermarolling (weekly) | said |
 | Reminders | One evening nudge from the Shortcut listing what's left today | chose (Q5) |
-| Visual style | **Style B — dark & bold** (black background, Apple-Watch-style rings, big numbers) | chose (mockups) |
+| Visual style | Two dark themes, **Bento** (colour-block tiles) and **Matrix** (dot-matrix, red accent). Theme is **Auto** by time of day: Bento 6 AM–7 PM, Matrix 7 PM–6 AM. A ◐ toggle overrides until the next switch-over. Replaces the earlier "style B dark & bold" | chose (Q15–Q17, mockups) |
 | Habit view | Planner-style **wheel** + **grid**, with a toggle | chose (mockups) |
 | Stack | Angular + Tailwind, Supabase (DB + login + one function), GitHub Pages | chose (Q6) |
 | Repo | Public, personal GitHub account `BrutalOverkill`, app name **Countdown** | chose (Q7) |
@@ -47,12 +47,50 @@ A personal tracker for Anvit, used on the iPhone (installed to the home screen) 
 
 ![The four screens](assets/screens.png)
 
+*These screen mockups (and the game-layer one in §4.6) show the earlier single dark style. Their content and behaviour still apply; the look now follows the two themes in §4.0.*
+
 Bottom tab bar on the phone: **Today · Habits · Food · Settings**. On screens ≥ 1024 px wide the tabs become a left sidebar and Today's cards flow into two columns; the content is otherwise identical.
 
-Theme tokens (dark only): background `#000`, card `#1C1C1E`, raised `#2C2C2E`, text `#FFF`, muted `#8E8E93`; accents — steps lime `#A3F53B`, calories pink `#FF375F`, routines cyan `#32D7FA`, countdown yellow `#FFD60A`, weekly purple `#BF5AF2`.
+### 4.0 Themes
+
+![Bento and Matrix](assets/themes.png)
+
+Two dark themes share every screen and layout; only colours, fonts and shapes change. The theme is set as `data-theme="bento" | "matrix"` on `<html>`, and all styling comes from CSS variables and theme-scoped classes. The fonts are bundled with the app (Fontsource packages), so they work offline and nothing loads from Google.
+
+| | **Bento** | **Matrix** |
+|---|---|---|
+| Base | black `#000`; neutral tile `#161616`; muted `#8E8E93` | black `#000`; boxes with a 1 px `#2A2A2A` border; muted `#8A8A8A` |
+| Tiles | solid colour blocks with black text: pink `#FF3D8B` (countdown), lime `#C8FF00` (score), blue `#3D7BFF` (steps), violet `#8B5CF6` (fasting), orange `#FF7A1A` (calories); radius 22 px | every tile is a bordered black box with off-white `#F2F2F2` text; radius 18 px |
+| Accent | lime `#C8FF00` (buttons, active tab, ticked pills) | one red `#FF3B30` (highlights, today, streak, active states) |
+| Numbers | Space Grotesk, weight 700, tight tracking | **Doto** dot-matrix, weight 900 |
+| Text | Space Grotesk | Space Mono; labels uppercase with wide tracking |
+| Rings & bars | solid arcs and rounded bars | rings made of dots, and 10-dot bars |
+| Routine ticks | pills, lime when done (`✓`) | `●` done / `○` not done |
+| Habit wheel | each habit's own colour | all dots off-white; today and ⭐ Perfect Days in red |
+| Tab bar | floating dark pill with icons; lime dot on the active tab | floating bordered pill with uppercase text labels |
+
+**Choosing the theme (Auto):**
+- Effective theme = a valid override if there is one, else the preference.
+- Preference **Auto** (default): Bento when the IST clock is 06:00–18:59, Matrix from 19:00 to 05:59. Preference **Bento** or **Matrix** always wins.
+- **◐ toggle** (Today header): flips the theme on screen. Under Auto it stores an override that expires at the next switch-over (the next 06:00 or 19:00 IST). Under a fixed preference it switches the preference itself.
+- Both are remembered **per device** (`localStorage`). The last applied theme is set by a tiny script in `index.html` before the app starts, so the wrong theme never flashes.
+- Changing theme crossfades with a View Transition when the browser supports it and Reduce Motion is off.
+
+### 4.0.1 Motion
+
+- Rings and bars fill with a spring when a screen opens; key numbers count up from 0 (about 600 ms).
+- Tiles and buttons squish slightly on press (`scale(.97)`); a ticked routine pops.
+- Tabs crossfade and slide between screens (View Transitions API, where supported).
+- The 🔥 streak flickers gently; the countdown number flips when the day changes; there's confetti on a Perfect Day (the Matrix theme uses red/white dot confetti).
+- `prefers-reduced-motion: reduce` (iOS Reduce Motion) switches all of it off: values appear at once, with no transitions.
 
 ### 4.1 Today
-- Header: date (e.g. `MON 19 OCT`) and a **↻ Sync iPhone** button. The button opens `shortcuts://run-shortcut?name=Countdown%20Sync`; it is shown only on iOS.
+Layout is a **bento grid**: two columns on the phone, four on wide screens.
+- Full width: countdown, routines, challenges.
+- Half width: score, steps, fasting, calories, workout.
+
+The cards below are those tiles, with tile tones as in §4.0.
+- Header: date (e.g. `MON 19 OCT`), a greeting ("let's get it, Anvit"), a **◐ theme toggle** and, on iOS only, a **↻ Sync iPhone** button. The Sync button opens `shortcuts://run-shortcut?name=Countdown%20Sync`.
 - **Score card** (first card): a ring showing today's score out of 100, labelled `LIVE`. Beside it:
   - "N of M done · K to go for a ⭐ Perfect Day" — or "⭐ Perfect Day!" once it's 100
   - a 🔥 streak chip ("12-day streak")
@@ -119,6 +157,7 @@ Theme tokens (dark only): background `#000`, card `#1C1C1E`, raised `#2C2C2E`, t
   - status: "Connected · last sync {time}" or "Never synced"
   - **Generate / rotate token** (shown once, with a copy button)
   - link to the setup steps
+- **Appearance:** Theme — **Auto** (Bento by day, Matrix at night) · **Bento** · **Matrix**. Stored on this device only.
 - **Account:** signed-in email, Sign out.
 
 ### 4.6 Game layer: Perfect Day moment and report card
@@ -421,7 +460,12 @@ What blocks:
 Six layers (chose Q13). The first two run in CI on every push. Layers 3–5 run on demand: locally with `npm run test:live`, or from a manual GitHub workflow. They use a dedicated **test user** whose data is wiped at the start of each run.
 
 1. **Unit tests:** everything listed above and below, written test-first.
-2. **Component tests** (Angular TestBed): each screen's components get fed sample view models. They assert on what's rendered and what taps emit. Cases include:
+2. **Component tests** (Angular TestBed): each screen's components get fed sample view models. They assert on what's rendered and what taps emit. Theme cases:
+   - theme logic: Auto at 05:59 / 06:00 / 18:59 / 19:00 IST, an override until the next switch-over, an expired override, fixed preferences, blocked storage
+   - rings and bars draw arcs in Bento and dots in Matrix
+   - count-up jumps straight to the value under Reduce Motion
+
+   Other cases include:
    - fasting card open vs fasting
    - ⚠️ on an outside-window entry
    - challenge chips
@@ -439,6 +483,7 @@ Six layers (chose Q13). The first two run in CI on every push. Layers 3–5 run 
    - a failed data load → "Couldn't load your data" → Retry recovers
    - sign-out discards the session's data (going Back doesn't show it)
    - Settings validation for windows
+   - theme: Bento at a pinned 2 PM, Matrix at 8 PM; ◐ flips it and the override survives a reload
 4. **Live function tests** (Node script, test user's token):
    - `sync`:
      - 401 for no or wrong token
@@ -465,6 +510,7 @@ Six layers (chose Q13). The first two run in CI on every push. Layers 3–5 run 
    - Food Guard outside the windows (e.g. 2 PM), inside a window under target (e.g. 11:30 AM), at target, App Store blocked, server unreachable (airplane mode → app opens), old token (→ "couldn't check" notification)
    - 4 AM rollover on the device
    - Perfect Day overlay on the phone
+   - themes on the device: Auto switching at 7 PM / 6 AM, ◐ override, Reduce Motion on → no animations, fonts render offline
 
 Before calling a task done, every screen is also checked by hand in a real browser on the PC (phone-sized and desktop-sized).
 
