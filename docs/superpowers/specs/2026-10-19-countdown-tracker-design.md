@@ -31,13 +31,15 @@ A personal tracker for Anvit, used on the iPhone (installed to the home screen) 
 | Stack | Angular + Tailwind, Supabase (DB + login + one function), GitHub Pages | chose (Q6) |
 | Repo | Public, personal GitHub account `BrutalOverkill`, app name **Countdown** | chose (Q7) |
 | Game layer | Daily score + Perfect Days + streak with a weekly freeze; countdown challenges + report card | chose (Q8, mockups) |
-| Food Guard | Once today's calories reach the target, opening a food app (or the App Store) sends you straight back to the home screen — hard close, no "open anyway" | chose (Q9) |
+| Food Guard | Once today's calories reach the target, **or outside the eating windows**, opening a food app (or the App Store) sends you straight back to the home screen — hard close, no "open anyway". Apps are picked one by one (Shortcuts can't target the App Store "Food & Drink" category). | chose (Q9, Q10) |
+| Intermittent fasting | Eating windows **12:00–1:00 AM** and **11:00 AM–1:00 PM** (editable, up to 3). They are both the eating windows and the only times food apps open. | said (Q10, Q12) |
+| Day boundary | The app's day runs **4:00 AM → 3:59 AM IST**, so late-night meals and routines count as the previous day (late work hours) | chose (Q11) |
 | Timezone | All "days" are India time (`Asia/Kolkata`) | assumed, confirmed |
 | Calories "on target" | At least one food logged that day **and** total ≤ target | assumed, confirmed |
 
 ## 3. Scope
 
-**In v1:** the four screens below, the game layer (§4.6), the sync function, the iPhone Shortcut (with written setup steps), the Food Guard (§9.1), login, auto-deploy, installable PWA.
+**In v1:** the four screens below, the game layer (§4.6), intermittent fasting (§4.1 fasting card, §4.3, §4.4, §8.4), the sync function, the iPhone Shortcut (with written setup steps), the Food Guard (§9.1), login, auto-deploy, installable PWA.
 
 **Not in v1** (can be added later): food database search, set/rep detail from Strong, per-routine timed push notifications, offline editing, charts beyond wheel/grid/streaks, multiple users, XP/levels/self-set rewards, badges.
 
@@ -67,6 +69,9 @@ Theme tokens (dark only): background `#000`, card `#1C1C1E`, raised `#2C2C2E`, t
   - a progress bar with a white pace marker at `target × elapsed ÷ window`
 
   The card's footer reads "N days left", or "Need X of the next N days" when a row is BEHIND. Rules: §8.2.
+- **Fasting card** (only when fasting is on), updated every minute:
+  - Inside a window: "🍽️ Eating window · closes {end time} · {Xh Ym} left", with a ring showing how much of the window has passed.
+  - Otherwise: "🌙 Fasting · {Xh Ym} done · next window {start time} in {Xh Ym}", with a ring showing how much of the current fast has passed. The fast runs from the end of the previous window to the start of the next.
 - **Rings card:** three concentric rings with figures beside them.
   - Steps: today's count / step goal. Below: "Steps synced {time}". This label turns amber if the last sync was more than 24 h ago.
   - Calories: today's total / calorie goal.
@@ -85,7 +90,11 @@ Theme tokens (dark only): background `#000`, card `#1C1C1E`, raised `#2C2C2E`, t
 
 ### 4.3 Food
 - Summary: today's kcal / goal, "N left" (or "N over" in pink), progress bar, protein total if any protein was logged.
-- **Quick add:** food name, kcal, optional protein (g), and a ☆ "save to favourites" toggle. Typing in the name field suggests matching saved foods.
+- **Quick add:** food name, kcal, optional protein (g), a **time** field and a ☆ "save to favourites" toggle.
+  - Time defaults to now for today, or 12:00 for past days.
+  - A time before 4:00 AM means the early hours *after* that day's midnight.
+  - Typing in the name field suggests matching saved foods.
+- **Outside-window flag:** when fasting is on, every log entry eaten outside the eating windows shows ⚠️ and the time in pink.
 - **Saved foods:** chips sorted by how often they're used; tapping one adds it now. Long-press (or right-click on PC) edits or deletes the saved food.
 - **Today's log:** time + name + kcal, newest at the bottom. Swipe (or the ⋯ button on PC) to edit or delete. A day switcher at the top allows viewing/correcting previous days; an entry added to a past day gets `eaten_at` = that day at 12:00 IST.
 
@@ -101,6 +110,11 @@ Theme tokens (dark only): background `#000`, card `#1C1C1E`, raised `#2C2C2E`, t
 
   Archive replaces delete, so history stays. The three auto habits (10k steps, Calories on target, Workout) can be reordered and archived, but not edited.
 - **Targets:** step goal (default 10,000), calorie goal (default 2,000).
+- **Fasting:**
+  - an on/off switch (default on)
+  - the eating windows, each a start and end time (defaults 00:00–01:00 and 11:00–13:00); add one (max 3) or remove one
+  - validation: each window's start is before its end on the same clock day, and windows don't overlap
+  - Turning fasting off archives the ⚡ "Fasting windows kept" habit. Turning it back on creates a new one.
 - **iPhone Shortcut:**
   - status: "Connected · last sync {time}" or "Never synced"
   - **Generate / rotate token** (shown once, with a copy button)
@@ -137,20 +151,20 @@ Email + password screen, shown when there's no session. **New sign-ups are disab
 |---|---|
 | **Web app** | Angular (current stable, standalone components + signals, zoneless — same setup as the Kumkum site), Tailwind CSS 4, `@angular/service-worker` for installability and caching the app shell. `supabase-js` v2 for login and data. Served from GitHub Pages at `https://brutaloverkill.github.io/countdown-tracker/`. |
 | **Supabase** | Free tier, region Mumbai (`ap-south-1`). Postgres + Auth + two Edge Functions: `sync` (§7) and `food-guard` (§7.1). |
-| **iPhone Shortcut** | "Countdown Sync" — reads Apple Health, POSTs to `sync`, shows a notification from the reply. Run by a daily personal automation (default 9:30 PM, "Run Immediately") and by the ↻ Sync iPhone button. |
+| **iPhone Shortcut** | "Countdown Sync" — reads Apple Health, POSTs to `sync`, shows a notification from the reply. Run by a daily personal automation (default 1:30 AM, "Run Immediately") and by the ↻ Sync iPhone button. Plus a second Shortcut, "Food Guard", run by an App-opened automation (§9.1). |
 | **GitHub** | Repo + GitHub Actions: on push to `main`, run tests, build, and deploy to Pages. SPA routing via a copied `404.html`. |
 
 PWA details: manifest `name`/`short_name` "Countdown", `display: standalone`, `theme_color`/`background_color` `#000000`, 180 px `apple-touch-icon`, `apple-mobile-web-app-status-bar-style: black-translucent`.
 
 ## 6. Data model (Supabase Postgres)
 
-Every table has `user_id uuid not null default auth.uid() references auth.users`, and an RLS policy allowing all operations only where `user_id = auth.uid()`. All `day` columns are IST calendar dates written by the client or the sync function.
+Every table has `user_id uuid not null default auth.uid() references auth.users`, and an RLS policy allowing all operations only where `user_id = auth.uid()`. All `day` columns are **app days** (§8), written by the client or the functions. The exception is `steps_daily.day`, which follows Apple Health's calendar days.
 
 | Table | Columns | Keys / notes |
 |---|---|---|
-| `settings` | `step_goal int default 10000`, `kcal_goal int default 2000`, `sync_token_hash text null`, `last_sync_at timestamptz null` | PK `user_id` |
+| `settings` | `step_goal int default 10000`, `kcal_goal int default 2000`, `sync_token_hash text null`, `last_sync_at timestamptz null`, `fasting_enabled boolean default true`, `eating_windows jsonb default '[{"start":"00:00","end":"01:00"},{"start":"11:00","end":"13:00"}]'` (array of `{start,end}` `HH:MM` IST clock times, end exclusive) | PK `user_id` |
 | `countdowns` | `id uuid`, `title text`, `emoji text`, `target_date date`, `created_at` | |
-| `habits` | `id uuid`, `name text`, `emoji text`, `color text`, `frequency text check in ('daily','weekly')`, `source text check in ('manual','steps','calories','workout')`, `slot text check in ('morning','night','anytime')`, `weekday smallint null` (0 = Sun, weekly only), `sort_order int`, `archived_at timestamptz null`, `created_at` | Seeded: 10k steps, Calories on target, Workout (auto); AM skincare, PM skincare, Minoxidil AM, Minoxidil PM (daily manual); Dermarolling (weekly manual, preferred day Sunday — editable) |
+| `habits` | `id uuid`, `name text`, `emoji text`, `color text`, `frequency text check in ('daily','weekly')`, `source text check in ('manual','steps','calories','workout','fasting')`, `slot text check in ('morning','night','anytime')`, `weekday smallint null` (0 = Sun, weekly only), `sort_order int`, `archived_at timestamptz null`, `created_at` | Seeded: 10k steps, Calories on target, Workout, Fasting windows kept (auto); AM skincare, PM skincare, Minoxidil AM, Minoxidil PM (daily manual); Dermarolling (weekly manual, preferred day Sunday — editable) |
 | `habit_checks` | `id uuid`, `habit_id uuid → habits`, `day date`, `created_at` | unique (`habit_id`, `day`); only for `source = 'manual'` |
 | `tasks` | `id uuid`, `title text`, `month date` (first of month), `done_at timestamptz null`, `created_at` | monthly one-offs |
 | `challenges` | `id uuid`, `countdown_id uuid → countdowns on delete cascade`, `habit_id uuid → habits`, `target_days int check > 0`, `start_day date`, `created_at` | max 3 per countdown (enforced in the app); window = `start_day` … `target_date − 1` |
@@ -159,7 +173,7 @@ Every table has `user_id uuid not null default auth.uid() references auth.users`
 | `saved_foods` | `id uuid`, `name text`, `kcal int`, `protein_g numeric null`, `use_count int default 0` | |
 | `food_entries` | `id uuid`, `eaten_at timestamptz`, `day date`, `name text`, `kcal int check 0..10000`, `protein_g numeric null`, `saved_food_id uuid null` | |
 
-`rotate_sync_token()` — a `security definer` Postgres function callable by the signed-in user. It generates 32 random bytes and stores their SHA-256 hash in `settings.sync_token_hash`. It returns the plain token once; the plain token is never stored.
+`rotate_sync_token()` — a Postgres function that runs as the signed-in user, so RLS applies. It generates 32 random bytes and stores their SHA-256 hash in `settings.sync_token_hash`. It returns the plain token once; the plain token is never stored.
 
 ## 7. Sync function contract
 
@@ -169,23 +183,27 @@ Request headers: `Authorization: Bearer <sync token>`, `Content-Type: applicatio
 
 ```json
 {
-  "today": "2026-10-19",
   "steps": [ { "date": "2026-10-13", "count": 9120 }, { "date": "2026-10-19", "count": 7842 } ],
   "workouts": [ { "start": "2026-10-19T18:02:00+05:30", "durationMin": 52, "name": "Traditional Strength Training" } ]
 }
 ```
 
+The server works out "today" itself, as the app day (§8), so the phone never has to.
+
 Behaviour:
 1. Hash the token; find the `settings` row with that hash. Not found → `401 {"error":"Token not recognised — copy it again from Settings"}`.
 2. Validate:
-   - `today` and `steps[].date` are `YYYY-MM-DD` dates, not in the future, and within the last 31 days
-   - counts are 0–100,000
+   - `steps[].date` are `YYYY-MM-DD` dates, not after the IST calendar date 15 minutes from now, and within the 31 days before it
+   - counts are 0–100,000 (numeric strings and decimals accepted, rounded)
+   - workout `start`s parse as date-times in that same range
    - at most 31 step rows and 20 workouts
+   - a missing or `null` list counts as empty, and a single object counts as a one-item list (Shortcuts quirks)
+   - duplicate dates or starts in one request: the last one wins
 
-   Any failure → `400 {"error":"<what was wrong>"}`; nothing is saved.
-3. Upsert steps by (`user_id`, `day`) — the newer count wins. Upsert workouts by (`user_id`, `started_at`), with `day` = IST date of `start`.
+   Any other failure → `400 {"error":"<what was wrong>"}`; nothing is saved.
+3. Upsert steps by (`user_id`, `day`) — the newer count wins. Upsert workouts by (`user_id`, `started_at`), with `day` = app day of `start`.
 4. Set `settings.last_sync_at = now()`.
-5. Work out what's pending for `today`:
+5. Work out what's pending for the app's today:
    - manual daily habits not ticked today
    - weekly habits whose `weekday` is today's weekday and that aren't done in the current week (§8)
 6. Reply `200`:
@@ -200,23 +218,33 @@ Behaviour:
 
 `POST https://<project>.supabase.co/functions/v1/food-guard` — JWT verification off. It uses the same `Authorization: Bearer <sync token>` and the same token check and 401 reply as `sync`. The body is ignored (the Shortcut sends `{}`). It does **not** touch `last_sync_at`.
 
-- Today = current IST date (server side). `kcal` = sum of today's `food_entries.kcal`; `goal` = `settings.kcal_goal`.
+- Today = the app day (§8), worked out server side. `kcal` = sum of that day's `food_entries.kcal`; `goal` = `settings.kcal_goal`.
 - `reached` = `kcal ≥ goal` (so exactly on target counts as reached).
+- `fasting` = `fasting_enabled` and the current IST clock time is outside every eating window (§8.4).
+- `blocked` = `reached || fasting`.
+- `message`:
+  - when reached: `"🛑 2,050 kcal today — target hit. Kitchen's closed."`
+  - when only fasting: `"🌙 Fasting — next window opens at 11:00 AM."`
+  - otherwise `""`
 - Reply `200`:
 
 ```json
-{ "kcal": 2050, "goal": 2000, "reached": true, "message": "🛑 2,050 kcal today — target hit. Kitchen's closed." }
+{ "kcal": 2050, "goal": 2000, "reached": true, "fasting": false, "nextWindow": "11:00 AM", "blocked": true, "message": "🛑 2,050 kcal today — target hit. Kitchen's closed." }
 ```
 
-  When not reached: `"reached": false`, `"message": ""`. Errors use the same `error` shapes as `sync`.
+  `nextWindow` is `null` when fasting is off. Errors use the same `error` shapes as `sync`.
 
 ## 8. Rules (derived, not stored)
 
-- **Today** = current date in `Asia/Kolkata`.
+- **App day** of an instant = the IST calendar date of (instant − 4 hours). The app's day runs from 4:00 AM to 3:59 AM IST, so a 12:30 AM meal or a 1 AM tick belongs to the previous day. **Today** = the app day of now. It rolls over at 4:00 AM IST, and a page left open overnight updates by itself.
+  - Food entries, workouts and habit ticks get the app day of their time.
+  - Steps keep Apple Health's calendar days (Health groups by midnight).
+  - Countdown days count app days, so at 1 AM on the 8th, Diwali still shows "1 day".
 - **Steps habit done** on a day ⇔ `steps_daily.count ≥ settings.step_goal`.
 - **Calories habit done** on a day ⇔ ≥ 1 food entry that day **and** total kcal ≤ `kcal_goal`. Today's dot stays empty until the day is over (it can't be judged mid-day); the Today screen shows progress instead.
 - **Workout habit done** on a day ⇔ any `workouts` row with that `day`.
 - **Manual habit done** on a day ⇔ a `habit_checks` row for that habit and day.
+- **Fasting habit done** on a day ⇔ ≥ 1 food entry that day **and** every entry's IST clock time is inside an eating window (§8.4). Today's dot stays empty until the day is over, like calories; for the live score it counts while no entry so far is outside a window and there is at least one entry.
 - Goal changes re-score all past days (accepted trade-off of not storing results).
 - **Weeks (W1–W5)** are planner-style blocks of the month: W1 = days 1–7, W2 = 8–14, W3 = 15–21, W4 = 22–28, W5 = 29–end. A weekly habit is done in a week if it has any check on a day in that block. "This week" on Today and in the sync nudge uses the same blocks.
 - **Habit streak** (grid stats) = consecutive done days of one habit ending today (if done) or yesterday. **Best streak** = longest run within the shown month. No freezes here.
@@ -260,6 +288,14 @@ For a challenge with window `start_day … end_day` (`end_day = target_date − 
 - **Workout days** = days in the period with a workout. **Calorie target days** = days the calories habit was done.
 - **Habit %** = done days ÷ active days in the period, per manual daily habit.
 
+### 8.4 Eating windows
+
+- A window `{start, end}` covers IST clock minutes `start ≤ t < end` (end exclusive). `00:00–01:00` covers 12:00–12:59 AM.
+- **Inside a window** = the clock time is inside any window. It's judged on the clock only, never the app day: the 12–1 AM window is the same window every night.
+- **Next window start** = the first window start later than now; if none is left today, the earliest start tomorrow. It's shown as `h:mm AM/PM`, e.g. `12:00 AM`, `11:00 AM`.
+- **Current fast** (fasting card): from the most recent window end before now to the next window start. With the defaults, that's 1:00 AM → 11:00 AM (10 h) and 1:00 PM → 12:00 AM (11 h).
+- **Valid windows:** 1–3 windows; `HH:MM` 24-hour; start < end; no two overlap. Saved sorted by start.
+
 ## 9. iPhone Shortcut
 
 **Before building (first implementation step, ~2 minutes on the phone):**
@@ -277,7 +313,7 @@ If Workouts can't be read, the Shortcut sends steps only, and the workout card r
 4. Get Contents of URL — POST the JSON from §7 with the `Authorization` header.
 5. If the reply has `error` → Show Notification "Countdown sync failed: {error}". Otherwise, if `message` isn't empty → Show Notification `{message}`.
 
-**Automation:** Shortcuts → Automation → Time of Day 9:30 PM daily → Run Immediately → run "Countdown Sync".
+**Automation:** Shortcuts → Automation → Time of Day **1:30 AM** daily → Run Immediately → run "Countdown Sync". It runs after the late-night meal and routines; it's still "today" until 4 AM. Any time works, and a second automation, e.g. 9:30 PM, is fine too.
 
 ### 9.1 Food Guard (hard close)
 
@@ -286,16 +322,20 @@ A web app can't block other apps on iOS; only Screen Time can, and Shortcuts can
 **Shortcut "Food Guard":**
 1. Text: the sync token (the same one).
 2. Get Contents of URL — POST `{}` to `food-guard` with the `Authorization` header.
-3. Get Dictionary Value `reached`. If it is true:
+3. Get Dictionary Value `blocked`. If it is true:
    - **Go to Home Screen**
    - **Show Notification** `{message}`
 
    Otherwise, do nothing.
 4. If the request fails or the reply has an `error` key, do nothing, so the app opens normally. It fails open: a server problem never locks you out.
 
-**Automation:** Shortcuts → Automation → **App** → "Is Opened" → choose the food apps, e.g. Swiggy, Zomato, Zepto, Blinkit, Domino's and McDonald's, plus the **App Store** (so food apps can't be reinstalled once you're at target) → Run Immediately → run "Food Guard". Turn "Notify When Run" off.
+**Automation:** Shortcuts → Automation → **App** → "Is Opened" → choose the food apps, e.g. Swiggy, Zomato, Zepto, Blinkit, Domino's and McDonald's, plus the **App Store** (so food apps can't be installed while blocked) → Run Immediately → run "Food Guard". Turn "Notify When Run" off.
+- Shortcuts can't select the App Store's "Food & Drink" category, so each app is ticked once, by hand. A newly installed food app needs adding to the automation.
+- Screen Time's "Shopping & Food" category limit is an optional extra Anvit can set by hand. It's a fixed daily allowance and doesn't react to calories or windows.
 
-Depends on food being logged in the app: with nothing logged, `kcal` is 0 and nothing is blocked.
+What blocks:
+- **outside the eating windows** (when fasting is on): always, logged or not
+- **inside a window:** only once logged calories reach the target. With nothing logged, `kcal` is 0, so it doesn't block.
 
 ## 10. Errors and edge cases
 
@@ -313,6 +353,10 @@ Depends on food being logged in the app: with nothing logged, `kcal` is 0 and no
 | Sync token leaked / phone lost | Rotate token in Settings; the old one stops working immediately |
 | Food Guard can't reach the server (offline, error) | Does nothing; the food app opens normally (fails open) |
 | Token rotated but Food Guard still has the old one | 401 → Food Guard does nothing; Settings' setup steps remind you to paste the new token into **both** shortcuts |
+| Meal at 12:30 AM | Belongs to the previous app day (before 4 AM); inside the 00:00–01:00 window, so no ⚠️ |
+| Lunch logged at 9 PM | Time field set to 12:15 → stored at 12:15, inside the window; logging late never flags a meal by itself |
+| Eating windows changed | Past days re-score against the new windows (same trade-off as goals) |
+| Invalid windows (overlap, start ≥ end, more than 3) | Inline message in Settings; nothing saved |
 
 ## 11. Security
 
@@ -325,6 +369,10 @@ Depends on food being logged in the app: with nothing logged, `kcal` is 0 and no
 
 - **Unit tests** (Angular's default test runner):
   - countdown day maths, including just before and after midnight IST
+  - the app day: 3:59 AM is still the previous day, 4:00 AM is the new day; the clock rolls at 4 AM
+  - eating windows: membership at start/end edges, next window start (later today / tomorrow), current fast length, validation
+  - fasting habit: all inside, one outside, no entries, today live vs final
+  - fasting card states
   - auto-habit scoring
   - daily score, Perfect Day (including the today-only calories rule)
   - overall streak with freezes (two misses in one week, a miss on Sunday then Monday, no history)
@@ -340,7 +388,7 @@ Depends on food being logged in the app: with nothing logged, `kcal` is 0 and no
   - steps upsert overwrites
   - workout de-duplication
   - pending/message builder
-  - Food Guard result: below / exactly at / above the goal, and no entries
+  - Food Guard result: below / exactly at / above the goal, no entries, fasting hours (blocked even with 0 kcal), fasting off, both reasons at once (target message wins)
 - **RLS check:** a script signs in as a second test user and confirms it can read and write none of the owner's rows.
 - **Browser check:** every screen exercised in a real browser on the PC (phone-sized and desktop-sized) before calling it done.
 - **On-device check (Anvit):** install to home screen, build the Shortcut, run it once, confirm steps/workout appear and the nudge shows.
@@ -349,7 +397,7 @@ Depends on food being logged in the app: with nothing logged, `kcal` is 0 and no
 
 1. Create a free Supabase account and a project ("countdown", region Mumbai). Share the project URL, and run `npx supabase login` once so the CLI can deploy.
 2. After first deploy: create the owner login (email + password), then sign-ups get switched off.
-3. On the iPhone: open the site in Safari → Share → Add to Home Screen; build the Shortcut and the 9:30 PM automation from the written steps; build the Food Guard shortcut and its App-opened automation.
+3. On the iPhone: open the site in Safari → Share → Add to Home Screen; build the Shortcut and the 1:30 AM automation from the written steps; build the Food Guard shortcut and its App-opened automation (ticking each food app + the App Store).
 
 ## 14. Risks to verify early
 
