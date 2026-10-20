@@ -8,6 +8,7 @@ import { FastingCard } from './fasting-card';
 import { DueCard } from './due-card';
 import { RoutinesCard } from './routines-card';
 import { ScoreCard } from './score-card';
+import { ScoreSheet } from './score-sheet';
 import { StepsTile } from './steps-tile';
 import { WorkoutCard } from './workout-card';
 
@@ -126,5 +127,42 @@ describe('Today tiles', () => {
       groups: [], weekly: [], intervals: [{ habit: derma, next: '2026-10-24', doneToday: true }], today: '2026-10-20', done: 0, total: 0, disabled: false,
     });
     expect(el.textContent).toContain('✓ 🪡 Dermarolling done · next Sat 24 Oct');
+  });
+
+  it('ScoreCard opens the popup of what is left when tapped', async () => {
+    const { fixture, el } = await render(ScoreCard, { score: { done: 4, total: 8, score: 50 }, perfect: false, streak: { length: 0, freezeAvailable: true, frozen: new Set() } });
+    let opened = 0;
+    fixture.componentInstance.opened.subscribe(() => opened++);
+    (el.querySelector('button') as HTMLButtonElement).click();
+    expect(opened).toBe(1);
+  });
+
+  it('ScoreSheet lists what is left with actions, what is done, and closes three ways', async () => {
+    const pm = habit('pm', { name: 'PM skincare', emoji: '🌙' });
+    const gym = habit('gym', { name: 'Workout', emoji: '💪', source: 'workout' });
+    const steps = habit('steps', { name: '10k steps', emoji: '👟', source: 'steps' });
+    const am = habit('am', { name: 'AM skincare', emoji: '🧴' });
+    const { fixture, el } = await render(ScoreSheet, {
+      score: { done: 1, total: 4, score: 25 },
+      checklist: {
+        left: [{ habit: steps, detail: '7,842 / 10,000', action: null }, { habit: gym, detail: 'Not yet', action: 'train' }, { habit: pm, detail: '', action: 'tick' }],
+        done: [{ habit: am, detail: '', action: 'tick' }],
+      },
+    });
+    const dialog = el.querySelector('[role=dialog]') as HTMLElement;
+    expect(dialog.getAttribute('aria-label')).toBe("What's left today");
+    expect(el.textContent).toContain('1 of 4 done');
+    expect(el.textContent).toContain('7,842 / 10,000');
+    expect(el.querySelector('[aria-label=Done]')?.textContent).toContain('AM skincare');
+    const out: string[] = [];
+    fixture.componentInstance.toggle.subscribe((id: string) => out.push('tick ' + id));
+    fixture.componentInstance.trained.subscribe(() => out.push('trained'));
+    fixture.componentInstance.closed.subscribe(() => out.push('closed'));
+    (el.querySelector('[aria-label="Tick PM skincare"]') as HTMLButtonElement).click();
+    (el.querySelector('[aria-label="Trained today"]') as HTMLButtonElement).click();
+    (el.querySelector('[aria-label=Close]') as HTMLButtonElement).click();
+    (el.querySelector('[data-testid=backdrop]') as HTMLElement).click();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(out).toEqual(['tick pm', 'trained', 'closed', 'closed', 'closed']);
   });
 });

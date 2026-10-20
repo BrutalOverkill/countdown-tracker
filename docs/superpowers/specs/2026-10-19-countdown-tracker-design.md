@@ -91,6 +91,7 @@ Layout is a **bento grid**: two columns on the phone, four on wide screens.
 
 The cards below are those tiles, with tile tones as in §4.0.
 - Header: date (e.g. `MON 19 OCT`), a greeting ("let's get it, Anvit"), a **◐ theme toggle** and, on iOS only, a **↻ Sync iPhone** button. The Sync button opens `shortcuts://run-shortcut?name=Countdown%20Sync`.
+- **Score popup:** tapping the Score card opens a sheet, "What's left today · X of Y done": every habit that counts today (§8.1), left first — routines with **Tick**, Workout with **Trained today ✓**, auto habits with their progress (steps `7,842 / 10,000`, calories/fasting "Log food to count it" or their status), interval habits "due today" / "overdue N days" — then the done ones greyed. ✕, a tap outside or Escape closes it.
 - **Score card** (first card): a ring showing today's score out of 100, labelled `LIVE`. Beside it:
   - "N of M done · K to go for a ⭐ Perfect Day" — or "⭐ Perfect Day!" once it's 100
   - a 🔥 streak chip ("12-day streak")

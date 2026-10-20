@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { AuthService } from '../../core/auth.service';
 import { Clock } from '../../core/clock';
 import { dayLabel, greetingName } from '../../core/format';
@@ -12,13 +12,14 @@ import { DueCard } from './due-card';
 import { FastingCard } from './fasting-card';
 import { RoutinesCard } from './routines-card';
 import { ScoreCard } from './score-card';
+import { ScoreSheet } from './score-sheet';
 import { StepsTile } from './steps-tile';
 import { buildTodayVm } from './today.vm';
 import { WorkoutCard } from './workout-card';
 
 @Component({
   selector: 'app-today-page',
-  imports: [ScoreCard, CountdownsCard, DueCard, FastingCard, StepsTile, CaloriesTile, WorkoutCard, RoutinesCard, ChallengesCard],
+  imports: [ScoreCard, ScoreSheet, CountdownsCard, DueCard, FastingCard, StepsTile, CaloriesTile, WorkoutCard, RoutinesCard, ChallengesCard],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let v = vm();
@@ -41,7 +42,7 @@ import { WorkoutCard } from './workout-card';
     }
     <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
       <app-countdowns-card class="col-span-2" [tiles]="v.countdowns" />
-      <app-score-card [score]="v.score" [perfect]="v.perfect" [streak]="v.streak" />
+      <app-score-card [score]="v.score" [perfect]="v.perfect" [streak]="v.streak" (opened)="sheetOpen.set(true)" />
       <app-steps-tile [steps]="v.steps" [goal]="v.stepGoal" [lastSyncAt]="v.lastSyncAt" [stale]="v.syncStale" />
       @if (v.fasting; as f) {
         <app-fasting-card [fasting]="f" />
@@ -54,6 +55,10 @@ import { WorkoutCard } from './workout-card';
         <app-challenges-card class="col-span-2" [group]="g" />
       }
     </div>
+    @if (sheetOpen()) {
+      <app-score-sheet [score]="v.score" [checklist]="v.checklist" [disabled]="!online()"
+        (toggle)="store.toggleCheck($event, v.today)" (trained)="store.addManualWorkout()" (closed)="sheetOpen.set(false)" />
+    }
   `,
 })
 export class TodayPage {
@@ -62,6 +67,7 @@ export class TodayPage {
   private readonly clock = inject(Clock);
   private readonly auth = inject(AuthService);
   protected readonly online = inject(Online).online;
+  protected readonly sheetOpen = signal(false);
   protected readonly isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
   protected readonly header = computed(() => dayLabel(this.store.today()).toUpperCase());
   protected readonly name = computed(() => greetingName(this.auth.email()));

@@ -43,6 +43,7 @@ describe('Habits cards', () => {
   });
 
   it('HabitWheel fills one cell per done day in the habit colour, stars perfect days and marks auto habits', async () => {
+    TestBed.inject(ThemeService).setPref('bento');
     const fixture = TestBed.createComponent(HabitWheel);
     fixture.componentRef.setInput('matrix', matrix);
     await fixture.whenStable();

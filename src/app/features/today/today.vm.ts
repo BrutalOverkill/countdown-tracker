@@ -2,9 +2,10 @@ import { addDays, daysBetween, weekBlockRange } from '@shared/days';
 import { nextDueOn } from '@shared/interval';
 import { fastState, formatClock, toMinutes } from '@shared/windows';
 import { challengeProgress, type ChallengeProgress } from '../../domain/challenges';
-import { dayScore, isPerfect, type DayScore } from '../../domain/scoring';
+import { formatNumber } from '../../core/format';
+import { dayScore, habitDone, isPerfect, type DayScore } from '../../domain/scoring';
 import { overallStreak, type StreakInfo } from '../../domain/streaks';
-import { bySortOrder, isActiveOn } from '../../domain/visibility';
+import { bySortOrder, isActiveOn, scoredHabitsOn } from '../../domain/visibility';
 import type { Challenge, Countdown, Ctx, Day, Habit, Slot, Workout } from '../../domain/types';
 
 export interface CountdownTile { id: string; title: string; emoji: string; days: number; isToday: boolean }
@@ -18,6 +19,10 @@ export interface IntervalLineVm { habit: Habit; next: Day; doneToday: boolean }
 export type FastingVm =
   | { kind: 'open'; closesAt: string; minutesLeft: number; fraction: number }
   | { kind: 'fasting'; nextAt: string; minutesUntilNext: number; doneMinutes: number; fraction: number };
+
+/** One line of the score popup: what counts today, how far along it is, and what can be done from there. */
+export interface ChecklistItem { habit: Habit; detail: string; action: 'tick' | 'train' | null }
+export interface ChecklistVm { left: ChecklistItem[]; done: ChecklistItem[] }
 
 export interface TodayVm {
   today: Day;
@@ -36,6 +41,7 @@ export interface TodayVm {
   weekly: WeeklyVm[];
   due: DueVm[];
   intervals: IntervalLineVm[];
+  checklist: ChecklistVm;
   workouts: readonly Workout[];
   challengeGroups: ChallengeGroupVm[];
   lastSyncAt: string | null;
@@ -139,9 +145,42 @@ export function buildTodayVm(i: TodayInput): TodayVm {
     weekly,
     due,
     intervals,
+    checklist: checklistFor(i.habits, ctx),
     workouts: ctx.history.workouts.get(today) ?? [],
     challengeGroups,
     lastSyncAt: i.lastSyncAt,
     syncStale: i.lastSyncAt === null || i.now.getTime() - Date.parse(i.lastSyncAt) > 24 * 3_600_000,
   };
+}
+
+/** Everything that counts in today's score, split into left and done, in sort order (same rules as the score). */
+function checklistFor(habits: readonly Habit[], ctx: Ctx): ChecklistVm {
+  const items = scoredHabitsOn(habits, ctx.today, ctx.history.checks).map((habit) => {
+    const done = habitDone(habit, ctx.today, ctx, 'live');
+    const action: ChecklistItem['action'] = habit.source === 'manual' ? 'tick' : habit.source === 'workout' ? 'train' : null;
+    return { done, item: { habit, detail: detailFor(habit, done, ctx), action } };
+  });
+  return { left: items.filter((x) => !x.done).map((x) => x.item), done: items.filter((x) => x.done).map((x) => x.item) };
+}
+
+function detailFor(habit: Habit, done: boolean, ctx: Ctx): string {
+  const food = ctx.history.food.get(ctx.today);
+  const logged = !!food && food.entries > 0;
+  switch (habit.source) {
+    case 'steps':
+      return `${formatNumber(ctx.history.steps.get(ctx.today) ?? 0)} / ${formatNumber(ctx.goals.stepGoal)}`;
+    case 'calories':
+      if (!logged) return 'Log food to count it';
+      return done ? `${formatNumber(food.kcal)} / ${formatNumber(ctx.goals.kcalGoal)} kcal` : `${formatNumber(food.kcal - ctx.goals.kcalGoal)} kcal over`;
+    case 'fasting':
+      if (!logged) return 'Log food to count it';
+      return done ? 'All inside your windows' : 'Ate outside a window';
+    case 'workout':
+      return done ? 'Trained' : 'Not yet';
+    case 'manual': {
+      if (done || habit.intervalDays === null || habit.intervalStart === null) return '';
+      const late = daysBetween(nextDueOn(ctx.today, habit.intervalStart, habit.intervalDays, ctx.history.checks.get(habit.id) ?? []), ctx.today);
+      return late > 0 ? `overdue ${late} day${late === 1 ? '' : 's'}` : 'due today';
+    }
+  }
 }

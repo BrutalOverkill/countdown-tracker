@@ -73,4 +73,24 @@ describe('buildTodayVm', () => {
     expect(at('2026-10-26', ['2026-10-20']).due).toEqual([{ habit: derma, since: '2026-10-24', overdueDays: 2 }]);
     expect(at('2026-10-26', ['2026-10-20']).score.total).toBe(1);
   });
+
+  it('lists what is left today and what is done, with progress for automatic habits', () => {
+    const list = [
+      habit('steps', { name: '10k steps', source: 'steps', sortOrder: 1 }),
+      habit('kcal', { name: 'Calories on target', source: 'calories', sortOrder: 2 }),
+      habit('gym', { name: 'Workout', source: 'workout', sortOrder: 4 }),
+      habit('am', { name: 'AM skincare', slot: 'morning', sortOrder: 5 }),
+      habit('pm', { name: 'PM skincare', slot: 'night', sortOrder: 6 }),
+      habit('d', { name: 'Dermarolling', frequency: 'interval', intervalDays: 4, intervalStart: '2026-10-17', sortOrder: 9 }),
+    ];
+    const vm = buildTodayVm(input({ habits: list, ctx: ctx('2026-10-19', history({ checks: { am: ['2026-10-19'] }, steps: { '2026-10-19': 7842 } })) }));
+    expect(vm.checklist.left.map((i) => [i.habit.id, i.detail, i.action])).toEqual([
+      ['steps', '7,842 / 10,000', null],
+      ['kcal', 'Log food to count it', null],
+      ['gym', 'Not yet', 'train'],
+      ['pm', '', 'tick'],
+      ['d', 'overdue 2 days', 'tick'],
+    ]);
+    expect(vm.checklist.done.map((i) => i.habit.id)).toEqual(['am']);
+  });
 });

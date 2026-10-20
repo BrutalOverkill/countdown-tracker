@@ -150,7 +150,12 @@ body {
 }
 
 /* iOS "Reduce Motion" turns every animation and transition off. */
+/* The score popup slides up from the bottom. */
+.sheet { animation: sheet-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes sheet-up { from { transform: translateY(24px); opacity: 0; } }
+
 @media (prefers-reduced-motion: reduce) {
+  .sheet { animation: none; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
