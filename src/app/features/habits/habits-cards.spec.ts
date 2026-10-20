@@ -21,13 +21,15 @@ const matrix = buildMonthMatrix(habits, '2026-10-19', ctx('2026-10-19', history(
 describe('Habits cards', () => {
   beforeEach(() => localStorage.clear());
 
-  it('HabitWheel draws off-white dots and a red star in Matrix', async () => {
+  it('HabitWheel fills done cells off-white and stars in red in Matrix', async () => {
     TestBed.inject(ThemeService).setPref('matrix');
     const fixture = TestBed.createComponent(HabitWheel);
     fixture.componentRef.setInput('matrix', matrix);
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
-    expect([...el.querySelectorAll('circle')].every((c) => c.getAttribute('fill') === '#f2f2f2')).toBe(true);
+    const cells = [...el.querySelectorAll('path.cell')];
+    expect(cells).toHaveLength(3);
+    expect(cells.every((c) => c.getAttribute('fill') === '#f2f2f2')).toBe(true);
     expect([...el.querySelectorAll('text')].find((x) => x.textContent === '★')?.getAttribute('fill')).toBe('#ff3b30');
   });
 
@@ -40,12 +42,15 @@ describe('Habits cards', () => {
     expect(dot.style.background).toBe('rgb(242, 242, 242)');
   });
 
-  it('HabitWheel draws one dot per done day, stars perfect days and marks auto habits', async () => {
+  it('HabitWheel fills one cell per done day in the habit colour, stars perfect days and marks auto habits', async () => {
     const fixture = TestBed.createComponent(HabitWheel);
     fixture.componentRef.setInput('matrix', matrix);
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelectorAll('circle')).toHaveLength(3);
+    expect(el.querySelectorAll('circle')).toHaveLength(0);
+    const cells = [...el.querySelectorAll('path.cell')];
+    expect(cells).toHaveLength(3);
+    expect(cells.filter((c) => c.getAttribute('fill') === '#30D158')).toHaveLength(2);
     expect([...el.querySelectorAll('text')].map((t) => t.textContent)).toContain('★');
     expect(el.textContent).toContain('10k steps ⚡');
   });

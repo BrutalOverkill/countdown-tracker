@@ -1,4 +1,4 @@
-import { arcPath, dayAngle, dotRadius, polar, ringMid, ringWidth, WHEEL } from './wheel-geometry';
+import { arcPath, dayAngle, polar, ringMid, ringWidth, WHEEL } from './wheel-geometry';
 
 describe('wheel geometry', () => {
   it('measures angles clockwise from 12 o\'clock', () => {
@@ -21,10 +21,8 @@ describe('wheel geometry', () => {
     expect(ringMid(0, 7)).toBeCloseTo(134.75);
   });
 
-  it('spreads days over 270° and sizes dots to fit', () => {
+  it('spreads days over 270°', () => {
     expect(dayAngle(0, 30)).toBeCloseTo(4.5);
     expect(dayAngle(29, 30)).toBeCloseTo(265.5);
-    expect(dotRadius(134.75, 31)).toBe(4.6);
-    expect(dotRadius(60, 31)).toBeLessThan(4.6);
   });
 });

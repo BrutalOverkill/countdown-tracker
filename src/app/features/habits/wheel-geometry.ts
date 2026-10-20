@@ -31,7 +31,3 @@ export function ringMid(i: number, rings: number): number {
 export function dayAngle(i: number, days: number): number {
   return ((i + 0.5) * WHEEL.span) / days;
 }
-
-export function dotRadius(r: number, days: number): number {
-  return Math.min(4.6, ((r * WHEEL.span * Math.PI) / 180 / days) * 0.36);
-}

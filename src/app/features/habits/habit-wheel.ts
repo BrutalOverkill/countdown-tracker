@@ -2,12 +2,12 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import { monthLabel } from '../../core/format';
 import { ThemeService } from '../../core/theme.service';
 import type { MonthMatrix } from './month-matrix';
-import { arcPath, dayAngle, dotRadius, polar, ringMid, ringWidth, wedgePath, WHEEL } from './wheel-geometry';
+import { arcPath, dayAngle, polar, ringMid, ringWidth, wedgePath, WHEEL } from './wheel-geometry';
 
-// SVG colours per theme: Bento keeps each habit's colour; Matrix draws off-white dots with red highlights.
+// SVG colours per theme: Bento fills cells in each habit's colour; Matrix fills them off-white with red highlights.
 const INK = {
-  bento: { wedge: '#1f2d10', line: '#2c2c2e', label: '#d1d1d6', muted: '#8e8e93', today: '#c8ff00', star: '#ffd60a', centre: '#ffffff', dot: null as string | null },
-  matrix: { wedge: '#1a0806', line: '#1f1f1f', label: '#bdbdbd', muted: '#8a8a8a', today: '#ff3b30', star: '#ff3b30', centre: '#f2f2f2', dot: '#f2f2f2' as string | null },
+  bento: { wedge: '#1f2d10', line: '#2c2c2e', label: '#d1d1d6', muted: '#8e8e93', today: '#c8ff00', star: '#ffd60a', centre: '#ffffff', cell: null as string | null },
+  matrix: { wedge: '#1a0806', line: '#1f1f1f', label: '#bdbdbd', muted: '#8a8a8a', today: '#ff3b30', star: '#ff3b30', centre: '#f2f2f2', cell: '#f2f2f2' as string | null },
 };
 
 @Component({
@@ -19,6 +19,10 @@ const INK = {
         <path [attr.d]="w" [attr.fill]="ink().wedge" />
       }
       <path [attr.d]="band" fill="none" [attr.stroke]="ink().line" stroke-width="13" />
+      <!-- Done days fill their whole cell, like colouring in the paper planner; grid lines draw on top. -->
+      @for (c of cells(); track c.key) {
+        <path class="cell" [attr.d]="c.d" [attr.fill]="c.color" />
+      }
       @for (d of dayLabels(); track d.key) {
         <text [attr.x]="d.x" [attr.y]="d.y + 2.5" text-anchor="middle" font-size="6.5" [attr.fill]="d.fill" [attr.font-weight]="d.bold ? 800 : 500">{{ d.text }}</text>
       }
@@ -27,9 +31,6 @@ const INK = {
       }
       @for (s of spokes(); track $index) {
         <line [attr.x1]="s[0]" [attr.y1]="s[1]" [attr.x2]="s[2]" [attr.y2]="s[3]" [attr.stroke]="ink().line" stroke-width="0.8" />
-      }
-      @for (dot of dots(); track dot.key) {
-        <circle [attr.cx]="dot.x" [attr.cy]="dot.y" [attr.r]="dot.r" [attr.fill]="dot.color" />
       }
       @for (l of labels(); track l.key) {
         <line x1="6" [attr.y1]="l.y + 4" [attr.x2]="cx - 2" [attr.y2]="l.y + 4" [attr.stroke]="ink().line" stroke-width="0.6" />
@@ -79,15 +80,14 @@ export class HabitWheel {
     Array.from({ length: this.matrix().days.length + 1 }, (_, s) => [...polar(this.inner(), s * this.step()), ...polar(WHEEL.outer, s * this.step())]),
   );
 
-  protected readonly dots = computed(() => {
+  protected readonly cells = computed(() => {
     const m = this.matrix();
+    const w = ringWidth(m.rows.length);
     return m.rows.flatMap((row, i) => {
-      const r = ringMid(i, m.rows.length);
-      return row.done.flatMap((done, j) => {
-        if (!done) return [];
-        const [x, y] = polar(r, dayAngle(j, m.days.length));
-        return [{ key: `${row.habit.id}-${j}`, x, y, r: dotRadius(r, m.days.length), color: this.ink().dot ?? row.habit.color }];
-      });
+      const rOut = WHEEL.outer - i * w;
+      return row.done.flatMap((done, j) =>
+        done ? [{ key: `${row.habit.id}-${j}`, d: wedgePath(rOut - w, rOut, j * this.step(), (j + 1) * this.step()), color: this.ink().cell ?? row.habit.color }] : [],
+      );
     });
   });
 
