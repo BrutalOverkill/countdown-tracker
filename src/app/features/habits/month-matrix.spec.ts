@@ -51,4 +51,12 @@ describe('buildMonthMatrix', () => {
     // Due 20 (done), 24–26 (done 26), 30–31: 6 due days, 2 done.
     expect(m.rows[0]).toMatchObject({ doneCount: 2, elapsed: 6 });
   });
+
+  it('keeps a times-a-week habit on the wheel with this week’s count', () => {
+    const gym = habit('gym', { source: 'workout', frequency: 'times_per_week', timesPerWeek: 4, createdDay: '2026-09-01' });
+    const m = buildMonthMatrix([gym], '2026-10-01', ctx('2026-10-22', history({ workouts: ['2026-10-14', '2026-10-19', '2026-10-21'] })), new Set());
+    expect(m.rows[0]).toMatchObject({ doneCount: 3, weekLabel: '2 / 4 this week' });
+    const past = buildMonthMatrix([gym], '2026-09-01', ctx('2026-10-22', history({ workouts: ['2026-09-10'] })), new Set());
+    expect(past.rows[0].weekLabel).toBe('1 sessions');
+  });
 });
