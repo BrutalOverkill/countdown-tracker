@@ -165,4 +165,13 @@ describe('Today tiles', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(out).toEqual(['tick pm', 'trained', 'closed', 'closed', 'closed']);
   });
+
+  it('WorkoutCard shows the week and highlights a needed day', async () => {
+    const { fixture, el } = await render(WorkoutCard, { workouts: [], week: { done: 2, target: 4, needed: true } });
+    expect(el.textContent).toContain('This week 2 / 4');
+    expect(el.textContent).toContain('Needed today to reach 4');
+    fixture.componentRef.setInput('week', { done: 1, target: 4, needed: false });
+    await fixture.whenStable();
+    expect(el.textContent).not.toContain('Needed today');
+  });
 });

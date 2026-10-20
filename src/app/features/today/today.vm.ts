@@ -3,7 +3,7 @@ import { nextDueOn } from '@shared/interval';
 import { fastState, formatClock, toMinutes } from '@shared/windows';
 import { challengeProgress, type ChallengeProgress } from '../../domain/challenges';
 import { formatNumber } from '../../core/format';
-import { dayScore, habitDone, isPerfect, scoredHabitsOn, type DayScore } from '../../domain/scoring';
+import { dayScore, habitDone, isPerfect, scoredHabitsOn, weekProgress, type DayScore } from '../../domain/scoring';
 import { overallStreak, type StreakInfo } from '../../domain/streaks';
 import { bySortOrder, isActiveOn } from '../../domain/visibility';
 import type { Challenge, Countdown, Ctx, Day, Habit, Slot, Workout } from '../../domain/types';
@@ -42,6 +42,7 @@ export interface TodayVm {
   due: DueVm[];
   intervals: IntervalLineVm[];
   checklist: ChecklistVm;
+  workoutWeek: { done: number; target: number; needed: boolean } | null;
   workouts: readonly Workout[];
   challengeGroups: ChallengeGroupVm[];
   lastSyncAt: string | null;
@@ -105,6 +106,9 @@ export function buildTodayVm(i: TodayInput): TodayVm {
     else intervals.push({ habit, next, doneToday: false });
   }
 
+  const gym = active.find((h) => h.source === 'workout' && h.frequency === 'times_per_week');
+  const workoutWeek = gym ? weekProgress(gym, today, ctx) : null;
+
   const upcoming = i.countdowns.filter((c) => c.targetDate >= today).sort((a, b) => a.targetDate.localeCompare(b.targetDate));
 
   const challengeGroups = upcoming
@@ -146,6 +150,7 @@ export function buildTodayVm(i: TodayInput): TodayVm {
     due,
     intervals,
     checklist: checklistFor(i.habits, ctx),
+    workoutWeek,
     workouts: ctx.history.workouts.get(today) ?? [],
     challengeGroups,
     lastSyncAt: i.lastSyncAt,
@@ -175,8 +180,11 @@ function detailFor(habit: Habit, done: boolean, ctx: Ctx): string {
     case 'fasting':
       if (!logged) return 'Log food to count it';
       return done ? 'All inside your windows' : 'Ate outside a window';
-    case 'workout':
-      return done ? 'Trained' : 'Not yet';
+    case 'workout': {
+      if (habit.frequency !== 'times_per_week') return done ? 'Trained' : 'Not yet';
+      const w = weekProgress(habit, ctx.today, ctx);
+      return done ? `Trained · ${w.done} / ${w.target} this week` : `${w.done} / ${w.target} this week · needed today`;
+    }
     case 'manual': {
       if (done || habit.intervalDays === null || habit.intervalStart === null) return '';
       const late = daysBetween(nextDueOn(ctx.today, habit.intervalStart, habit.intervalDays, ctx.history.checks.get(habit.id) ?? []), ctx.today);

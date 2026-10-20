@@ -50,7 +50,7 @@ import { WorkoutCard } from './workout-card';
       <app-calories-tile [kcal]="v.kcal" [goal]="v.kcalGoal" />
       <app-routines-card class="col-span-2" [groups]="v.routines" [weekly]="v.weekly" [intervals]="v.intervals" [today]="v.today" [done]="v.routinesDone" [total]="v.routinesTotal"
         [disabled]="!online()" (toggle)="store.toggleCheck($event, v.today)" />
-      <app-workout-card class="col-span-2" [workouts]="v.workouts" [disabled]="!online()" (trained)="store.addManualWorkout()" (remove)="store.removeWorkout($event)" />
+      <app-workout-card class="col-span-2" [workouts]="v.workouts" [week]="v.workoutWeek" [disabled]="!online()" (trained)="store.addManualWorkout()" (remove)="store.removeWorkout($event)" />
       @for (g of v.challengeGroups; track g.countdownId) {
         <app-challenges-card class="col-span-2" [group]="g" />
       }

@@ -93,4 +93,14 @@ describe('buildTodayVm', () => {
     ]);
     expect(vm.checklist.done.map((i) => i.habit.id)).toEqual(['am']);
   });
+
+  it('shows the Workout week, and lists Workout as left only when it is needed', () => {
+    const gym = habit('gym', { name: 'Workout', source: 'workout', frequency: 'times_per_week', timesPerWeek: 4 });
+    const at = (today: string, workouts: string[]) => buildTodayVm(input({ habits: [gym], ctx: ctx(today, history({ workouts })) }));
+    expect(at('2026-10-21', ['2026-10-19']).workoutWeek).toEqual({ done: 1, target: 4, needed: false });
+    expect(at('2026-10-21', ['2026-10-19']).checklist.left).toEqual([]);
+    expect(at('2026-10-24', ['2026-10-19', '2026-10-21']).checklist.left.map((i) => i.detail)).toEqual(['2 / 4 this week · needed today']);
+    expect(at('2026-10-24', ['2026-10-19', '2026-10-21', '2026-10-24']).checklist.done.map((i) => i.detail)).toEqual(['Trained · 3 / 4 this week']);
+    expect(buildTodayVm(input({ habits: [] })).workoutWeek).toBeNull();
+  });
 });

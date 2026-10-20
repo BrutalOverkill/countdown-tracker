@@ -9,6 +9,13 @@ import type { Workout } from '../../domain/types';
   template: `
     <section class="tile h-full" aria-label="Workout">
       <p class="label mb-1 text-steps">Workout · from Strong</p>
+      @if (week(); as wk) {
+        <p class="mb-1 text-xs font-bold">This week {{ wk.done }} / {{ wk.target }}
+          @if (wk.needed && workouts().length === 0) {
+            <span class="ml-1 rounded-md bg-accent px-1.5 py-0.5 text-black">Needed today to reach {{ wk.target }}</span>
+          }
+        </p>
+      }
       @for (w of workouts(); track w.id) {
         <div class="flex items-center justify-between py-1 text-sm">
           <span>💪 <b>{{ w.name ?? (w.source === 'manual' ? 'Trained' : 'Workout') }}</b></span>
@@ -27,6 +34,7 @@ import type { Workout } from '../../domain/types';
 })
 export class WorkoutCard {
   readonly workouts = input.required<readonly Workout[]>();
+  readonly week = input<{ done: number; target: number; needed: boolean } | null>(null);
   readonly disabled = input(false);
   readonly trained = output<void>();
   readonly remove = output<Workout>();
