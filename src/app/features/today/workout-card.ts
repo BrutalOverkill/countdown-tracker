@@ -12,7 +12,7 @@ import type { Workout } from '../../domain/types';
       @if (week(); as wk) {
         <p class="mb-1 text-xs font-bold">This week {{ wk.done }} / {{ wk.target }}
           @if (wk.needed && workouts().length === 0) {
-            <span class="ml-1 rounded-md bg-accent px-1.5 py-0.5 text-black">Needed today to reach {{ wk.target }}</span>
+            <span class="ml-1 rounded-md bg-accent px-1.5 py-0.5 text-black">{{ wk.reachable ? 'Needed today to reach ' + wk.target : 'Needed today' }}</span>
           }
         </p>
       }
@@ -34,7 +34,7 @@ import type { Workout } from '../../domain/types';
 })
 export class WorkoutCard {
   readonly workouts = input.required<readonly Workout[]>();
-  readonly week = input<{ done: number; target: number; needed: boolean } | null>(null);
+  readonly week = input<{ done: number; target: number; needed: boolean; reachable: boolean } | null>(null);
   readonly disabled = input(false);
   readonly trained = output<void>();
   readonly remove = output<Workout>();

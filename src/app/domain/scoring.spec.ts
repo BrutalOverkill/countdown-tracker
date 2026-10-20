@@ -98,15 +98,19 @@ describe('times-a-week habits', () => {
 
   it('is needed only when the week cannot reach the target without that day', () => {
     const c = trained(['2026-10-19', '2026-10-21']);
-    expect(weekProgress(gym, '2026-10-22', c)).toEqual({ done: 2, target: 4, needed: false });
-    expect(weekProgress(gym, '2026-10-24', c)).toEqual({ done: 2, target: 4, needed: true });
+    expect(weekProgress(gym, '2026-10-22', c)).toEqual({ done: 2, target: 4, needed: false, reachable: true });
+    expect(weekProgress(gym, '2026-10-24', c)).toEqual({ done: 2, target: 4, needed: true, reachable: true });
     expect(weekProgress(gym, '2026-10-25', trained(['2026-10-19', '2026-10-21', '2026-10-24'])).needed).toBe(true);
   });
 
   it('stops being needed once the target is reached, and restarts on Monday', () => {
     const c = trained(['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22']);
-    expect(weekProgress(gym, '2026-10-25', c)).toEqual({ done: 4, target: 4, needed: false });
+    expect(weekProgress(gym, '2026-10-25', c)).toEqual({ done: 4, target: 4, needed: false, reachable: true });
     expect(weekProgress(gym, '2026-10-26', trained(['2026-10-19'])).done).toBe(0);
+  });
+
+  it('says when the target can no longer be reached this week', () => {
+    expect(weekProgress(gym, '2026-10-23', trained([]))).toEqual({ done: 0, target: 4, needed: true, reachable: false });
   });
 
   it('counts a week that spans two months', () => {

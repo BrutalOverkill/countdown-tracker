@@ -167,10 +167,14 @@ describe('Today tiles', () => {
   });
 
   it('WorkoutCard shows the week and highlights a needed day', async () => {
-    const { fixture, el } = await render(WorkoutCard, { workouts: [], week: { done: 2, target: 4, needed: true } });
+    const { fixture, el } = await render(WorkoutCard, { workouts: [], week: { done: 2, target: 4, needed: true, reachable: true } });
     expect(el.textContent).toContain('This week 2 / 4');
     expect(el.textContent).toContain('Needed today to reach 4');
-    fixture.componentRef.setInput('week', { done: 1, target: 4, needed: false });
+    fixture.componentRef.setInput('week', { done: 0, target: 4, needed: true, reachable: false });
+    await fixture.whenStable();
+    expect(el.textContent).toContain('Needed today');
+    expect(el.textContent).not.toContain('to reach 4');
+    fixture.componentRef.setInput('week', { done: 1, target: 4, needed: false, reachable: true });
     await fixture.whenStable();
     expect(el.textContent).not.toContain('Needed today');
   });

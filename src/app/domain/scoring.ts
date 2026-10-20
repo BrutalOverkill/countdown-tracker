@@ -34,15 +34,15 @@ export function habitDone(h: Habit, day: Day, ctx: Ctx, mode: Mode = 'final'): b
   }
 }
 
-/** A times-a-week habit in the Monday–Sunday week of `day` (§8.6): sessions so far, the target, and whether `day` must be one. */
-export function weekProgress(h: Habit, day: Day, ctx: Ctx): { done: number; target: number; needed: boolean } {
+/** A times-a-week habit in the Monday–Sunday week of `day` (§8.6): sessions so far, the target, whether `day` must be one, and whether the target is still reachable. */
+export function weekProgress(h: Habit, day: Day, ctx: Ctx): { done: number; target: number; needed: boolean; reachable: boolean } {
   const target = h.timesPerWeek ?? 0;
   const start = isoWeekStart(day);
   const before = eachDay(start, addDays(day, -1)).filter((d) => isActiveOn(h, d) && habitDone(h, d, ctx)).length;
   const today = habitDone(h, day, ctx, day === ctx.today ? 'live' : 'final') ? 1 : 0;
   const daysLeft = daysBetween(day, addDays(start, 6)) + 1;
   const missing = target - before;
-  return { done: before + today, target, needed: missing > 0 && missing >= daysLeft };
+  return { done: before + today, target, needed: missing > 0 && missing >= daysLeft, reachable: missing <= daysLeft };
 }
 
 /** Habits that count in a day's score: daily ones, interval habits due that day, times-a-week habits done or needed that day (§8.1). */

@@ -42,7 +42,7 @@ export interface TodayVm {
   due: DueVm[];
   intervals: IntervalLineVm[];
   checklist: ChecklistVm;
-  workoutWeek: { done: number; target: number; needed: boolean } | null;
+  workoutWeek: { done: number; target: number; needed: boolean; reachable: boolean } | null;
   workouts: readonly Workout[];
   challengeGroups: ChallengeGroupVm[];
   lastSyncAt: string | null;
