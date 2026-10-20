@@ -3,7 +3,7 @@ import { DEFAULT_GOALS, EMPTY_HISTORY, type Ctx, type Day, type Goals, type Habi
 export function habit(id: string, extra: Partial<Habit> = {}): Habit {
   return {
     id, name: id, emoji: '✅', color: '#FFFFFF', frequency: 'daily', source: 'manual', slot: 'anytime',
-    weekday: null, intervalDays: null, intervalStart: null, sortOrder: 0, createdDay: '2026-10-01', archivedDay: null, ...extra,
+    weekday: null, intervalDays: null, intervalStart: null, timesPerWeek: null, sortOrder: 0, createdDay: '2026-10-01', archivedDay: null, ...extra,
   };
 }
 

@@ -16,11 +16,6 @@ export function isDue(h: Habit, day: Day, checks: ReadonlySet<Day> = new Set()):
     && isDueOn(day, h.intervalStart, h.intervalDays, checks);
 }
 
-/** Habits that count in a day's score: active daily habits plus interval habits due that day (§8.1). */
-export function scoredHabitsOn(habits: readonly Habit[], day: Day, checks: ReadonlyMap<string, ReadonlySet<Day>>): Habit[] {
-  return habits.filter((h) => (h.frequency === 'daily' && isActiveOn(h, day)) || isDue(h, day, checks.get(h.id))).sort(bySortOrder);
-}
-
 export function habitsForMonth(habits: readonly Habit[], month: Day): Habit[] {
   const first = monthStart(month);
   const last = monthEnd(month);

@@ -3,9 +3,9 @@ import { nextDueOn } from '@shared/interval';
 import { fastState, formatClock, toMinutes } from '@shared/windows';
 import { challengeProgress, type ChallengeProgress } from '../../domain/challenges';
 import { formatNumber } from '../../core/format';
-import { dayScore, habitDone, isPerfect, type DayScore } from '../../domain/scoring';
+import { dayScore, habitDone, isPerfect, scoredHabitsOn, type DayScore } from '../../domain/scoring';
 import { overallStreak, type StreakInfo } from '../../domain/streaks';
-import { bySortOrder, isActiveOn, scoredHabitsOn } from '../../domain/visibility';
+import { bySortOrder, isActiveOn } from '../../domain/visibility';
 import type { Challenge, Countdown, Ctx, Day, Habit, Slot, Workout } from '../../domain/types';
 
 export interface CountdownTile { id: string; title: string; emoji: string; days: number; isToday: boolean }
@@ -155,7 +155,7 @@ export function buildTodayVm(i: TodayInput): TodayVm {
 
 /** Everything that counts in today's score, split into left and done, in sort order (same rules as the score). */
 function checklistFor(habits: readonly Habit[], ctx: Ctx): ChecklistVm {
-  const items = scoredHabitsOn(habits, ctx.today, ctx.history.checks).map((habit) => {
+  const items = scoredHabitsOn(habits, ctx.today, ctx).map((habit) => {
     const done = habitDone(habit, ctx.today, ctx, 'live');
     const action: ChecklistItem['action'] = habit.source === 'manual' ? 'tick' : habit.source === 'workout' ? 'train' : null;
     return { done, item: { habit, detail: detailFor(habit, done, ctx), action } };

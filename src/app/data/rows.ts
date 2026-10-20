@@ -22,6 +22,7 @@ export interface HabitRow {
   weekday: number | null;
   interval_days: number | null;
   interval_start: string | null;
+  times_per_week: number | null;
   sort_order: number;
   archived_at: string | null;
   created_at: string;
@@ -42,7 +43,7 @@ export const toGoals = (r: SettingsRow): Goals => ({
 
 export const toHabit = (r: HabitRow): Habit => ({
   id: r.id, name: r.name, emoji: r.emoji, color: r.color, frequency: r.frequency, source: r.source, slot: r.slot,
-  weekday: r.weekday, intervalDays: r.interval_days, intervalStart: r.interval_start, sortOrder: r.sort_order,
+  weekday: r.weekday, intervalDays: r.interval_days, intervalStart: r.interval_start, timesPerWeek: r.times_per_week, sortOrder: r.sort_order,
   createdDay: appDayOf(new Date(r.created_at)),
   archivedDay: r.archived_at ? appDayOf(new Date(r.archived_at)) : null,
 });

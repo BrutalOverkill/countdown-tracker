@@ -1,5 +1,5 @@
 import { ctx, habit, history } from './testing';
-import { dayScore, habitDone, isGood, isPerfect } from './scoring';
+import { dayScore, habitDone, isGood, isPerfect, weekProgress } from './scoring';
 
 const T = '2026-10-20';
 const Y = '2026-10-19';
@@ -88,5 +88,36 @@ describe('dayScore', () => {
     expect(dayScore([daily, derma], '2026-10-20', c)).toMatchObject({ done: 2, total: 2 });
     expect(dayScore([daily, derma], '2026-10-22', c)).toMatchObject({ done: 1, total: 1 });
     expect(dayScore([daily, derma], '2026-10-25', c)).toMatchObject({ done: 1, total: 2 });
+  });
+});
+
+describe('times-a-week habits', () => {
+  const gym = habit('gym', { source: 'workout', frequency: 'times_per_week', timesPerWeek: 4 });
+  // Week of Mon 19 – Sun 25 Oct 2026.
+  const trained = (days: string[]) => ctx('2026-10-26', history({ workouts: days }));
+
+  it('is needed only when the week cannot reach the target without that day', () => {
+    const c = trained(['2026-10-19', '2026-10-21']);
+    expect(weekProgress(gym, '2026-10-22', c)).toEqual({ done: 2, target: 4, needed: false });
+    expect(weekProgress(gym, '2026-10-24', c)).toEqual({ done: 2, target: 4, needed: true });
+    expect(weekProgress(gym, '2026-10-25', trained(['2026-10-19', '2026-10-21', '2026-10-24'])).needed).toBe(true);
+  });
+
+  it('stops being needed once the target is reached, and restarts on Monday', () => {
+    const c = trained(['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22']);
+    expect(weekProgress(gym, '2026-10-25', c)).toEqual({ done: 4, target: 4, needed: false });
+    expect(weekProgress(gym, '2026-10-26', trained(['2026-10-19'])).done).toBe(0);
+  });
+
+  it('counts a week that spans two months', () => {
+    expect(weekProgress(gym, '2026-11-01', ctx('2026-11-02', history({ workouts: ['2026-10-26', '2026-10-31'] }))).done).toBe(2);
+  });
+
+  it('scores it on training days and needed days only, so a rest day keeps a Perfect Day possible', () => {
+    const am = habit('am');
+    const c = ctx('2026-10-26', history({ workouts: ['2026-10-19'], checks: { am: ['2026-10-20', '2026-10-24'] } }));
+    expect(dayScore([am, gym], '2026-10-19', c)).toMatchObject({ total: 2 });
+    expect(dayScore([am, gym], '2026-10-20', c)).toMatchObject({ done: 1, total: 1 });
+    expect(dayScore([am, gym], '2026-10-24', c)).toMatchObject({ done: 1, total: 2 });
   });
 });

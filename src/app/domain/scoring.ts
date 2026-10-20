@@ -1,5 +1,6 @@
+import { addDays, daysBetween, eachDay, isoWeekStart } from '@shared/days';
 import { inWindow } from '@shared/windows';
-import { scoredHabitsOn } from './visibility';
+import { bySortOrder, isActiveOn, isDue } from './visibility';
 import type { Ctx, Day, Habit, Mode } from './types';
 
 export function onCalorieTarget(day: Day, ctx: Ctx): boolean {
@@ -33,6 +34,30 @@ export function habitDone(h: Habit, day: Day, ctx: Ctx, mode: Mode = 'final'): b
   }
 }
 
+/** A times-a-week habit in the Monday–Sunday week of `day` (§8.6): sessions so far, the target, and whether `day` must be one. */
+export function weekProgress(h: Habit, day: Day, ctx: Ctx): { done: number; target: number; needed: boolean } {
+  const target = h.timesPerWeek ?? 0;
+  const start = isoWeekStart(day);
+  const before = eachDay(start, addDays(day, -1)).filter((d) => isActiveOn(h, d) && habitDone(h, d, ctx)).length;
+  const today = habitDone(h, day, ctx, day === ctx.today ? 'live' : 'final') ? 1 : 0;
+  const daysLeft = daysBetween(day, addDays(start, 6)) + 1;
+  const missing = target - before;
+  return { done: before + today, target, needed: missing > 0 && missing >= daysLeft };
+}
+
+/** Habits that count in a day's score: daily ones, interval habits due that day, times-a-week habits done or needed that day (§8.1). */
+export function scoredHabitsOn(habits: readonly Habit[], day: Day, ctx: Ctx): Habit[] {
+  return habits
+    .filter((h) => {
+      if (!isActiveOn(h, day)) return false;
+      if (h.frequency === 'daily') return true;
+      if (h.frequency === 'interval') return isDue(h, day, ctx.history.checks.get(h.id));
+      if (h.frequency === 'times_per_week') return habitDone(h, day, ctx, day === ctx.today ? 'live' : 'final') || weekProgress(h, day, ctx).needed;
+      return false;
+    })
+    .sort(bySortOrder);
+}
+
 export interface DayScore {
   done: number;
   total: number;
@@ -40,7 +65,7 @@ export interface DayScore {
 }
 
 export function dayScore(habits: readonly Habit[], day: Day, ctx: Ctx): DayScore {
-  const daily = scoredHabitsOn(habits, day, ctx.history.checks);
+  const daily = scoredHabitsOn(habits, day, ctx);
   const mode: Mode = day === ctx.today ? 'live' : 'final';
   const done = daily.filter((h) => habitDone(h, day, ctx, mode)).length;
   return { done, total: daily.length, score: daily.length === 0 ? 0 : Math.round((100 * done) / daily.length) };

@@ -1,5 +1,6 @@
-import { habit } from './testing';
-import { firstHabitDay, habitsForMonth, isActiveOn, scoredHabitsOn } from './visibility';
+import { scoredHabitsOn } from './scoring';
+import { ctx, habit } from './testing';
+import { firstHabitDay, habitsForMonth, isActiveOn } from './visibility';
 
 describe('visibility', () => {
   it('is active from the creation day until the archive day (exclusive)', () => {
@@ -15,7 +16,7 @@ describe('visibility', () => {
       habit('b', { sortOrder: 2 }), habit('a', { sortOrder: 1 }),
       habit('w', { frequency: 'weekly' }), habit('x', { archivedDay: '2026-10-10' }),
     ];
-    expect(scoredHabitsOn(list, '2026-10-19', new Map()).map((h) => h.id)).toEqual(['a', 'b']);
+    expect(scoredHabitsOn(list, '2026-10-19', ctx('2026-10-19')).map((h) => h.id)).toEqual(['a', 'b']);
   });
 
   it('shows a habit in a month it overlaps', () => {
