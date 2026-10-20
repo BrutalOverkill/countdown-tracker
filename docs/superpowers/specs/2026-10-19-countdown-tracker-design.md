@@ -129,7 +129,7 @@ The cards below are those tiles, with tile tones as in §4.0.
 - Interval habits (§8.5) get a ring on the wheel and a row in the grid like daily habits; a dot marks a day it was done. Their grid stats read "done X / due days".
 - Times-a-week habits (§8.6) keep their ring and row; a cell fills on a done day. Their grid stats read "X / N this week" for the current month, "X sessions" for past months.
 - **Monthly one-offs** card: a checklist of tasks for the shown month, with "+ add", tick, and swipe-to-delete.
-- Habits shown for a month: those created on or before the month's last day and not archived before its first day.
+- Habits shown for a month: those created on or before the month's last day and not archived by its last day — an archived habit leaves the wheel and grid of the month it was archived in at once, while earlier months keep its history.
 
 ### 4.3 Food
 - Summary: today's kcal / goal, "N left" (or "N over" in pink), progress bar, protein total if any protein was logged.

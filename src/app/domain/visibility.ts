@@ -1,4 +1,4 @@
-import { monthEnd, monthStart } from '@shared/days';
+import { monthEnd } from '@shared/days';
 import { isDueOn } from '@shared/interval';
 import type { Day, Habit } from './types';
 
@@ -17,9 +17,9 @@ export function isDue(h: Habit, day: Day, checks: ReadonlySet<Day> = new Set()):
 }
 
 export function habitsForMonth(habits: readonly Habit[], month: Day): Habit[] {
-  const first = monthStart(month);
   const last = monthEnd(month);
-  return habits.filter((h) => h.createdDay <= last && (h.archivedDay === null || h.archivedDay >= first)).sort(bySortOrder);
+  // An archived habit leaves the month it was archived in at once; earlier months keep showing its history.
+  return habits.filter((h) => h.createdDay <= last && (h.archivedDay === null || h.archivedDay > last)).sort(bySortOrder);
 }
 
 export function firstHabitDay(habits: readonly Habit[]): Day | null {
