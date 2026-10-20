@@ -190,7 +190,7 @@ Email + password screen, shown when there's no session. **New sign-ups are disab
 
 | Part | What it is |
 |---|---|
-| **Web app** | Angular (current stable, standalone components + signals, zoneless — same setup as the Kumkum site), Tailwind CSS 4, `@angular/service-worker` for installability and caching the app shell only (no API responses are cached). `supabase-js` v2 for login and data. Served from GitHub Pages at `https://brutaloverkill.github.io/countdown-tracker/`. |
+| **Web app** | Angular (current stable, standalone components + signals, zoneless — same setup as the Kumkum site), Tailwind CSS 4, `@angular/service-worker` for installability and caching the app shell only (no API responses are cached). A new deploy is picked up by itself: the app checks whenever it is opened or brought back and switches to the downloaded version at once — unless a field is being typed in, then on the next return. `supabase-js` v2 for login and data. Served from GitHub Pages at `https://brutaloverkill.github.io/countdown-tracker/`. |
 | **Supabase** | Free tier, region Mumbai (`ap-south-1`). Postgres + Auth + two Edge Functions: `sync` (§7) and `food-guard` (§7.1). |
 | **iPhone Shortcut** | "Countdown Sync" — reads Apple Health, POSTs to `sync`, shows a notification from the reply. Run by a daily personal automation (default 1:30 AM, "Run Immediately") and by the ↻ Sync iPhone button. Plus a second Shortcut, "Food Guard", run by an App-opened automation (§9.1). |
 | **GitHub** | Repo + GitHub Actions: on push to `main`, run tests, build, and deploy to Pages. SPA routing via a copied `404.html`. |
