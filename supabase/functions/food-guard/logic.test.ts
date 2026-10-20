@@ -5,9 +5,10 @@ import { guardResult } from './logic.ts';
 const base = { goal: 2000, fastingEnabled: true, windows: DEFAULT_WINDOWS };
 
 describe('guardResult', () => {
-  it('lets you in under target inside a window', () => {
-    expect(guardResult({ ...base, kcal: 1200, minute: 700 })).toEqual({
-      kcal: 1200, goal: 2000, reached: false, fasting: false, nextWindow: '12:00 AM', blocked: false, message: '',
+  it('lets you in under target inside a window, with no message for the Shortcut to act on', () => {
+    // The Shortcut bounces you whenever "message" has any value, so an allowed answer must not carry one at all.
+    expect(JSON.parse(JSON.stringify(guardResult({ ...base, kcal: 1200, minute: 700 })))).toStrictEqual({
+      kcal: 1200, goal: 2000, reached: false, fasting: false, nextWindow: '12:00 AM', blocked: false,
     });
   });
 

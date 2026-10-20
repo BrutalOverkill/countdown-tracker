@@ -16,7 +16,8 @@ export interface GuardResult {
   fasting: boolean;
   nextWindow: string | null;
   blocked: boolean;
-  message: string;
+  /** Only present when blocked: the Shortcut bounces you whenever it has any value. */
+  message?: string;
 }
 
 export function guardResult(i: GuardInput): GuardResult {
@@ -27,5 +28,6 @@ export function guardResult(i: GuardInput): GuardResult {
   const message = reached
     ? `🛑 ${i.kcal.toLocaleString('en-IN')} kcal today — target hit. Kitchen's closed.`
     : fasting ? `🌙 Fasting — next window opens at ${nextWindow}.` : '';
-  return { kcal: i.kcal, goal: i.goal, reached, fasting, nextWindow, blocked: reached || fasting, message };
+  const blocked = reached || fasting;
+  return { kcal: i.kcal, goal: i.goal, reached, fasting, nextWindow, blocked, ...(blocked ? { message } : {}) };
 }

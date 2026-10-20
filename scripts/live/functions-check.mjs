@@ -86,7 +86,7 @@ const away = now + 180 <= 1439 ? { start: hhmm(now + 120), end: hhmm(now + 180) 
 
 await db.from('settings').update({ fasting_enabled: true, eating_windows: [around] }).eq('user_id', userId);
 const open = (await call('food-guard', { ping: '1' })).body;
-assert.deepEqual([open.kcal, open.reached, open.fasting, open.blocked, open.message], [0, false, false, false, '']);
+assert.deepEqual([open.kcal, open.reached, open.fasting, open.blocked, 'message' in open], [0, false, false, false, false]);
 
 await db.from('food_entries').insert({ day: today, eaten_at: new Date().toISOString(), name: 'Test', kcal: 2000 });
 const atTarget = (await call('food-guard', {})).body;

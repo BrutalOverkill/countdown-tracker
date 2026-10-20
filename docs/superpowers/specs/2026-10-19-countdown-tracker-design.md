@@ -277,7 +277,7 @@ Behaviour:
 { "kcal": 2050, "goal": 2000, "reached": true, "fasting": false, "nextWindow": "11:00 AM", "blocked": true, "message": "🛑 2,050 kcal today — target hit. Kitchen's closed." }
 ```
 
-  `nextWindow` is `null` when fasting is off. Errors use the same `error` shapes as `sync`.
+  `nextWindow` is `null` when fasting is off. Errors use the same `error` shapes as `sync`. When nothing is blocked, `message` is left out entirely: the Shortcut bounces you whenever `message` has any value, and iOS can count an empty string as one.
 
 ## 8. Rules (derived, not stored)
 
